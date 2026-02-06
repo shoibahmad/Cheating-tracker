@@ -3,6 +3,7 @@ uvicorn
 pydantic
 python-multipart
 sqlmodel
-passlib[bcrypt]
+passlib
+bcrypt==4.0.1
 python-jose[cryptography]
 opencv-python-headless
