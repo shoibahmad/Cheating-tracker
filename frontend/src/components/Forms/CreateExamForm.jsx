@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 import { UserPlus, ArrowRight } from 'lucide-react';
 
 export const CreateExamForm = ({ defaultType = "University", onSuccess }) => {
@@ -15,7 +16,7 @@ export const CreateExamForm = ({ defaultType = "University", onSuccess }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:8000/api/sessions', {
+            const res = await fetch(`${API_BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)

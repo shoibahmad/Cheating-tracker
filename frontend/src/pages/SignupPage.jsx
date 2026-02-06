@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { User, Mail, Lock, ArrowRight, Building, GraduationCap, Shield } from 'lucide-react';
 
 export const SignupPage = () => {
@@ -23,7 +24,7 @@ export const SignupPage = () => {
         setLoading(true);
 
         try {
-            const res = await fetch('http://localhost:8000/api/auth/signup', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

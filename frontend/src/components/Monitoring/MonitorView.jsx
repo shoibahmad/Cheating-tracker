@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../../config';
 import { Archive, Eye, AlertTriangle } from 'lucide-react';
 
 export const MonitorView = ({ session, onBack }) => {
@@ -52,7 +53,7 @@ export const MonitorView = ({ session, onBack }) => {
             // Compress to jpg to save bandwidth
             const imageBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
-            const res = await fetch('http://localhost:8000/api/analyze_frame', {
+            const res = await fetch(`${API_BASE_URL}/api/analyze_frame`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -95,7 +96,7 @@ export const MonitorView = ({ session, onBack }) => {
         setTimeout(() => setAlertState(false), 2000); // Effect lasts 2 seconds
 
         // In real app, send to backend here
-        fetch(`http://localhost:8000/api/alert?session_id=${session.id}&alert_message=${encodeURIComponent(newAlert)}`, {
+        fetch(`${API_BASE_URL}/api/alert?session_id=${session.id}&alert_message=${encodeURIComponent(newAlert)}`, {
             method: 'POST'
         }).catch(console.error);
     };

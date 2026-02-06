@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { MonitorView } from '../components/Monitoring/MonitorView';
 import { LoadingScreen } from '../components/Common/LoadingScreen';
 
@@ -13,7 +14,7 @@ export const MonitorPage = () => {
         // Fetch session details
         const fetchSession = async () => {
             try {
-                const response = await fetch(`http://localhost:8000/api/sessions/${id}`);
+                const response = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
                 if (!response.ok) throw new Error("Session not found");
                 const data = await response.json();
                 setSession(data);

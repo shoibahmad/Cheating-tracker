@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import {
     ShieldAlert,
     Users,
@@ -22,8 +23,8 @@ export const DashboardPage = () => {
             await new Promise(r => setTimeout(r, 1000));
 
             try {
-                const statsRes = await fetch('http://localhost:8000/api/dashboard-stats');
-                const sessRes = await fetch('http://localhost:8000/api/sessions');
+                const statsRes = await fetch(`${API_BASE_URL}/api/dashboard-stats`);
+                const sessRes = await fetch(`${API_BASE_URL}/api/sessions`);
                 if (statsRes.ok) setStats(await statsRes.json());
                 if (sessRes.ok) setSessions(await sessRes.json());
                 else throw new Error("Backend offline");

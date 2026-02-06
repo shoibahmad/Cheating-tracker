@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { LoadingScreen } from '../components/Common/LoadingScreen';
 import { LiveSessionCard } from '../components/Dashboard/LiveSessionCard';
 
@@ -13,7 +14,7 @@ export const MonitorSelectionPage = () => {
             // Simulate loading for effect
             await new Promise(r => setTimeout(r, 800));
             try {
-                const res = await fetch('http://localhost:8000/api/sessions');
+                const res = await fetch(`${API_BASE_URL}/api/sessions`);
                 if (res.ok) setSessions(await res.json());
                 else throw new Error("Backend offline");
             } catch (e) {

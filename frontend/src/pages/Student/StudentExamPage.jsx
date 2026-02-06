@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 import { AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 
@@ -18,14 +19,14 @@ export const StudentExamPage = () => {
         const fetchExamData = async () => {
             try {
                 // 1. Get Session Details
-                const sessionRes = await fetch(`http://127.0.0.1:8000/api/sessions/${id}`);
+                const sessionRes = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
                 if (!sessionRes.ok) throw new Error("Session not found");
                 const sessionData = await sessionRes.json();
 
                 if (sessionData.question_paper_id) {
                     // 2. Get Question Paper
                     // Ideally we'd have a specific endpoint, but fetching all for now (MVP)
-                    const papersRes = await fetch('http://127.0.0.1:8000/api/question-papers');
+                    const papersRes = await fetch(`${API_BASE_URL}/api/question-papers`);
                     const papersData = await papersRes.json();
                     const paper = papersData.find(p => p.id === sessionData.question_paper_id);
 
@@ -84,7 +85,7 @@ export const StudentExamPage = () => {
             ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
             const imageBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
-            const res = await fetch('http://localhost:8000/api/analyze_frame', {
+            const res = await fetch(`${API_BASE_URL}/api/analyze_frame`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

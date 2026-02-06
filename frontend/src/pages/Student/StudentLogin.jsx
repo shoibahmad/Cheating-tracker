@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 
 import { LogIn, Key } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,7 +17,7 @@ export const StudentLogin = () => {
         // For now, we assume valid if not empty
         try {
             // Check if session exists (optional, reusing existing endpoint)
-            const res = await fetch(`http://localhost:8000/api/sessions/${sessionId}`);
+            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`);
             if (res.ok) {
                 toast.success('Joined exam session successfully');
                 navigate(`/student/exam/${sessionId}`);

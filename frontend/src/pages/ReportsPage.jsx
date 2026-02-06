@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { BarChart, PieChart, Activity, Download } from 'lucide-react';
 import { LoadingScreen } from '../components/Common/LoadingScreen';
 
@@ -11,7 +12,7 @@ export const ReportsPage = () => {
             // Simulate network delay for effect
             await new Promise(r => setTimeout(r, 800));
             try {
-                const res = await fetch('http://localhost:8000/api/reports');
+                const res = await fetch(`${API_BASE_URL}/api/reports`);
                 if (res.ok) setData(await res.json());
                 else throw new Error("Failed");
             } catch (e) {

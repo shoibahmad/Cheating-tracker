@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 
 export const StudentDashboard = () => {
     const navigate = useNavigate();
@@ -9,7 +10,7 @@ export const StudentDashboard = () => {
 
     useEffect(() => {
         // Fetch valid papers for "Sample" section
-        fetch('http://127.0.0.1:8000/api/question-papers')
+        fetch(`${API_BASE_URL}/api/question-papers`)
             .then(res => res.json())
             .then(data => setPapers(data))
             .catch(err => console.error(err));
@@ -28,7 +29,7 @@ export const StudentDashboard = () => {
     // Auto-fetch assigned exams
     useEffect(() => {
         if (studentName) {
-            fetch(`http://127.0.0.1:8000/api/sessions?student_name=${encodeURIComponent(studentName)}`)
+            fetch(`${API_BASE_URL}/api/sessions?student_name=${encodeURIComponent(studentName)}`)
                 .then(res => res.json())
                 .then(data => {
                     // Filter for Active exams that haven't been taken/terminated (logic can be refined)

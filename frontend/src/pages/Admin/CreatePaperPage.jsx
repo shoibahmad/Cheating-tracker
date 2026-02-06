@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import {
     Plus,
@@ -67,7 +68,7 @@ export const CreatePaperPage = () => {
         };
 
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/question-papers', {
+            const res = await fetch(`${API_BASE_URL}/api/question-papers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(paper)

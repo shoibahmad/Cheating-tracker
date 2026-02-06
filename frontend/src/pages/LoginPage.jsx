@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 
 
@@ -21,7 +22,7 @@ export const LoginPage = () => {
             formBody.append('username', formData.email);
             formBody.append('password', formData.password);
 
-            const res = await fetch('http://localhost:8000/api/auth/token', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formBody

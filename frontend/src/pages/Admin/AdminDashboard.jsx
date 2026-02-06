@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 import {
     BarChart,
     Bar,
@@ -50,11 +51,11 @@ export const AdminDashboard = () => {
         const loadData = async () => {
             try {
                 // Fetch stats
-                const statsRes = await fetch('http://127.0.0.1:8000/api/dashboard-stats');
+                const statsRes = await fetch(`${API_BASE_URL}/api/dashboard-stats`);
                 const statsData = await statsRes.json();
 
                 // Fetch sessions
-                const sessRes = await fetch('http://127.0.0.1:8000/api/sessions');
+                const sessRes = await fetch(`${API_BASE_URL}/api/sessions`);
                 const sessData = await sessRes.json();
 
                 setSessions(sessData);

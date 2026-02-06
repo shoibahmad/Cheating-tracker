@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import {
     User,
@@ -25,13 +26,13 @@ export const AssignExamPage = () => {
 
     useEffect(() => {
         // Fetch Question Papers
-        fetch('http://127.0.0.1:8000/api/question-papers')
+        fetch(`${API_BASE_URL}/api/question-papers`)
             .then(res => res.json())
             .then(data => setPapers(data))
             .catch(err => console.error(err));
 
         // Fetch Students
-        fetch('http://127.0.0.1:8000/api/students')
+        fetch(`${API_BASE_URL}/api/students`)
             .then(res => res.json())
             .then(data => setStudents(data))
             .catch(err => console.error(err));
@@ -41,7 +42,7 @@ export const AssignExamPage = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/admin/assign-exam?student_name=${encodeURIComponent(studentName)}&exam_type=${encodeURIComponent(examType)}&question_paper_id=${selectedPaper}`, {
+            const res = await fetch(`${API_BASE_URL}/api/admin/assign-exam?student_name=${encodeURIComponent(studentName)}&exam_type=${encodeURIComponent(examType)}&question_paper_id=${selectedPaper}`, {
                 method: 'POST'
             });
             const data = await res.json();
