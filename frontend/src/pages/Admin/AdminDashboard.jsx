@@ -21,7 +21,8 @@ import {
     FileText,
     TrendingUp,
     Activity,
-    CheckCircle
+    CheckCircle,
+    Edit
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -93,6 +94,9 @@ export const AdminDashboard = () => {
                     </Link>
                     <Link to="/admin/assign-exam" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
                         <Users size={18} /> Assign Exam
+                    </Link>
+                    <Link to="/admin/students" className="btn btn-secondary" style={{ gap: '0.5rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                        <Edit size={18} /> Manage Students
                     </Link>
                 </div>
             </div>

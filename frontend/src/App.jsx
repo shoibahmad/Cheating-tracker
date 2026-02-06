@@ -3,12 +3,15 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'rea
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Footer } from './components/Layout/Footer';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { StudentManagementPage } from './pages/Admin/StudentManagementPage';
 import { MonitorPage } from './pages/MonitorPage';
 import { MonitorSelectionPage } from './pages/MonitorSelectionPage';
 import { ScheduleExamPage } from './pages/ScheduleExamPage';
@@ -98,6 +101,7 @@ function App() {
           <Route path="/get-started" element={<GetStartedPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
         {/* Protected Dashboard Routes */}
@@ -113,16 +117,17 @@ function App() {
           <Route path="/exams" element={<ExamsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-        </Route>
 
-        {/* Student Routes - using PublicLayout for Exam access without full dashboard sidebar sometimes, or DashboardLayout if preferred */}
-        {/* Let's keep it in DashboardLayout for now for consistency with sidebar access */}
-        <Route element={<DashboardLayout />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/create-paper" element={<CreatePaperPage />} />
-          <Route path="/admin/assign-exam" element={<AssignExamPage />} />
+          {/* Protected Admin Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin" element={<AdminDashboard />} /> {/* Keep this for /admin base path */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/create-paper" element={<CreatePaperPage />} />
+            <Route path="/admin/assign-exam" element={<AssignExamPage />} />
+            <Route path="/admin/students" element={<StudentManagementPage />} />
+          </Route>
 
+          {/* Student Routes */}
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/student/login" element={<StudentLogin />} />

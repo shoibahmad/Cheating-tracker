@@ -93,6 +93,10 @@ export const LoginPage = () => {
                         </div>
                     </div>
 
+                    <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
+                        <a href="/forgot-password" style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textDecoration: 'none' }}>Forgot Password?</a>
+                    </div>
+
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '1.5rem' }} disabled={loading}>
                         {loading ? 'Signing In...' : 'Sign In'} <ArrowRight size={18} />
                     </button>

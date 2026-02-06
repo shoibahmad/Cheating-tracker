@@ -143,12 +143,10 @@ export const ProfileDrawer = ({ isOpen, onClose }) => {
 
                 {/* Actions */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
+                    <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { navigate('/settings'); onClose(); }}>
                         <Settings size={18} /> Account Settings
                     </button>
-                    <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                        <Award size={18} /> My Certificates
-                    </button>
+
                 </div>
 
                 <div style={{ marginTop: 'auto' }}>

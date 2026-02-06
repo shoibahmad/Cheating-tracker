@@ -128,6 +128,91 @@ def get_session_by_id(session_id: str, session: Session = Depends(get_session)):
 
 # --- Pydantic Models for Creation ---
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/auth/change-password")
+def change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    
+    current_user.password_hash = get_password_hash(password_data.new_password)
+    session.add(current_user)
+    session.commit()
+    return {"message": "Password updated successfully"}
+
+
+# --- Admin Student Management ---
+
+class StudentUpdate(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
+    role: str | None = None
+    institution: str | None = None
+    password: str | None = None
+
+@router.post("/admin/students", response_model=User)
+def create_student(user: UserCreate, session: Session = Depends(get_session)):
+    # Reusing UserCreate model but secured for Admin
+    statement = select(User).where(User.email == user.email)
+    existing_user = session.exec(statement).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    new_user = User(
+        email=user.email,
+        password_hash=hashed_password,
+        full_name=user.full_name,
+        role=user.role,
+        institution=user.institution
+    )
+    session.add(new_user)
+    session.commit()
+    session.refresh(new_user)
+    return new_user
+
+@router.get("/admin/students", response_model=List[User])
+def get_all_students(session: Session = Depends(get_session)):
+    return session.exec(select(User).where(User.role == "student")).all()
+
+@router.delete("/admin/students/{user_id}")
+def delete_student(user_id: int, session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    session.delete(user)
+    session.commit()
+    return {"message": "User deleted"}
+
+@router.put("/admin/students/{user_id}", response_model=User)
+def update_student(user_id: int, student_data: StudentUpdate, session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if student_data.full_name:
+        user.full_name = student_data.full_name
+    if student_data.email:
+        user.email = student_data.email
+    if student_data.institution:
+        user.institution = student_data.institution
+    if student_data.role:
+        user.role = student_data.role
+    if student_data.password:
+        user.password_hash = get_password_hash(student_data.password)
+        
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
 class QuestionCreate(BaseModel):
     text: str
     options: List[str]

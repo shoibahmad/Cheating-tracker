@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, Lock, User, Monitor, Save } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export const SettingsPage = () => {
     const [toggles, setToggles] = useState(() => {
@@ -108,6 +109,57 @@ export const SettingsPage = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="glass-card" style={{ marginTop: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <Lock size={24} style={{ color: 'var(--accent-warning)' }} />
+                    <h3>Change Password</h3>
+                </div>
+
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const current = e.target.current.value;
+                    const newPass = e.target.new.value;
+
+                    if (newPass.length < 6) {
+                        alert("Password must be at least 6 characters");
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ current_password: current, new_password: newPass })
+                        });
+
+                        if (res.ok) {
+                            alert('Password updated successfully!');
+                            e.target.reset();
+                        } else {
+                            const data = await res.json();
+                            alert(data.detail || 'Failed to update password');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('Error connecting to server');
+                    }
+                }} style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Current Password</label>
+                        <input name="current" type="password" className="glass-input" required style={{ width: '100%' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>New Password</label>
+                        <input name="new" type="password" className="glass-input" required style={{ width: '100%' }} />
+                    </div>
+                    <button type="submit" className="btn btn-secondary" style={{ marginBottom: '2px' }}>Update Password</button>
+                </form>
             </div>
 
             <div style={{ marginTop: '2rem', textAlign: 'right' }}>
