@@ -223,6 +223,18 @@ class QuestionPaperCreate(BaseModel):
     subject: str
     questions: List[QuestionCreate]
 
+class QuestionPaperRead(BaseModel):
+    id: str
+    title: str
+    subject: str
+    questions: List[Question] # Requires Question model (circular ref might be issue if not careful, but Question uses string for 'paper' or ignored)
+    
+class AssignExamRequest(BaseModel):
+    student_name: str
+    exam_type: str
+    question_paper_id: str
+
+
 @router.post("/question-papers", response_model=QuestionPaper)
 def create_question_paper(
     paper_data: QuestionPaperCreate, 
@@ -274,7 +286,7 @@ async def upload_question_paper(file: UploadFile = File(...)):
         print(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail="Failed to process file")
 
-@router.get("/question-papers/{paper_id}", response_model=QuestionPaper)
+@router.get("/question-papers/{paper_id}", response_model=QuestionPaperRead)
 def get_question_paper(paper_id: str, session: Session = Depends(get_session)):
     from sqlalchemy.orm import selectinload
     paper = session.exec(select(QuestionPaper).where(QuestionPaper.id == paper_id).options(selectinload(QuestionPaper.questions))).first()
@@ -289,11 +301,13 @@ def get_question_papers(session: Session = Depends(get_session)):
 
 @router.post("/admin/assign-exam")
 def assign_exam(
-    student_name: str, 
-    exam_type: str, 
-    question_paper_id: str,
+    request: AssignExamRequest,
     session: Session = Depends(get_session)
 ):
+    student_name = request.student_name
+    exam_type = request.exam_type
+    question_paper_id = request.question_paper_id
+
     session_id = str(uuid.uuid4())
     new_session = ExamSession(
         id=session_id,
@@ -397,7 +411,68 @@ def analyze_frame(data: FrameData, session: Session = Depends(get_session)):
 
         return {"status": "Active", "face_count": face_count}
 
+        return {"status": "Active", "face_count": face_count}
+
     except Exception as e:
         print(f"Error analyzing frame: {e}")
         return {"status": "Error", "message": str(e)}
+
+
+# --- Submission Routes ---
+
+class ExamSubmission(BaseModel):
+    answers: dict[str, int] # Question ID -> Selected Option Index (or string if value)
+
+@router.post("/sessions/{session_id}/submit")
+def submit_exam(
+    session_id: str, 
+    submission: ExamSubmission, 
+    session: Session = Depends(get_session)
+):
+    exam_session = session.get(ExamSession, session_id)
+    if not exam_session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    if not exam_session.question_paper_id:
+         # If no paper assigned, maybe just mark complete?
+         exam_session.status = "Completed"
+         session.add(exam_session)
+         session.commit()
+         return {"message": "Session completed", "score": 0, "total": 0}
+
+    # Fetch Paper and Questions
+    paper = session.get(QuestionPaper, exam_session.question_paper_id)
+    # We need to load questions. 
+    # Since we are inside the function, we can do a fresh select or rely on lazy loading if enabled, 
+    # but strictly it's better to eager load or query directly.
+    questions = session.exec(select(Question).where(Question.question_paper_id == exam_session.question_paper_id)).all()
+    
+    score = 0
+    total = len(questions)
+    
+    for q in questions:
+        # Check if question was answered
+        if q.id in submission.answers:
+            # simple comparison: correct_answer is int index
+            if submission.answers[q.id] == q.correct_answer:
+                score += 1
+    
+    # Calculate percentage or keep raw? Let's keep raw count or percentage. 
+    # User asked for "marks". Let's give percentage * 100 or just raw score.
+    # Let's save percentage in score field (0-100)
+    
+    final_score = (score / total * 100) if total > 0 else 0
+    
+    exam_session.score = round(final_score, 2)
+    exam_session.status = "Completed"
+    
+    session.add(exam_session)
+    session.commit()
+    
+    return {
+        "score": score, 
+        "total": total, 
+        "percentage": exam_session.score,
+        "message": "Exam submitted successfully"
+    }
 

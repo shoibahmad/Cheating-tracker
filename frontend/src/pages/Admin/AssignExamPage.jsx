@@ -42,8 +42,16 @@ export const AssignExamPage = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/assign-exam?student_name=${encodeURIComponent(studentName)}&exam_type=${encodeURIComponent(examType)}&question_paper_id=${selectedPaper}`, {
-                method: 'POST'
+            const res = await fetch(`${API_BASE_URL}/api/admin/assign-exam`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    student_name: studentName,
+                    exam_type: examType,
+                    question_paper_id: selectedPaper
+                })
             });
             const data = await res.json();
             setGeneratedSession(data);

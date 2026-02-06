@@ -2,7 +2,20 @@ import pytesseract
 from PIL import Image
 import io
 import re
-from pdf2image import convert_from_bytes
+import uuid
+# Try importing pypdf for direct text extraction
+try:
+    from pypdf import PdfReader
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
+# Try importing pdf2image for OCR fallback
+try:
+    from pdf2image import convert_from_bytes
+    HAS_PDF2IMAGE = True
+except ImportError:
+    HAS_PDF2IMAGE = False
 
 async def extract_text_from_image(file_bytes: bytes, filename: str = "") -> str:
     """
@@ -12,15 +25,35 @@ async def extract_text_from_image(file_bytes: bytes, filename: str = "") -> str:
     try:
         # Check if PDF
         if filename.lower().endswith('.pdf') or file_bytes[:4] == b'%PDF':
-            try:
-                images = convert_from_bytes(file_bytes)
-                for i, image in enumerate(images):
-                    page_text = pytesseract.image_to_string(image)
-                    text += f"\n--- Page {i+1} ---\n{page_text}"
-            except Exception as e:
-                print(f"PDF Conversion Error: {e}")
-                # Fallback or re-raise
-                return ""
+            print("Detected PDF file...")
+            
+            # Strategy 1: Direct Text Extraction (Fast, for digital PDFs)
+            if HAS_PYPDF:
+                try:
+                    pdf_file = io.BytesIO(file_bytes)
+                    reader = PdfReader(pdf_file)
+                    for i, page in enumerate(reader.pages):
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += f"\n--- Page {i+1} ---\n{page_text}"
+                    print(f"Directory PDF Extraction Paged: {len(reader.pages)}")
+                except Exception as e:
+                    print(f"pypdf extraction failed: {e}")
+            
+            # Strategy 2: OCR via pdf2image (Slow, for scanned PDFs)
+            # Use this if text is still empty (scanned file) or pypdf failed
+            if not text.strip() and HAS_PDF2IMAGE:
+                print("Falling back to OCR for PDF...")
+                try:
+                    images = convert_from_bytes(file_bytes)
+                    for i, image in enumerate(images):
+                        page_text = pytesseract.image_to_string(image)
+                        text += f"\n--- Page {i+1} ---\n{page_text}"
+                except Exception as e:
+                    print(f"PDF OCR Error: {e}")
+            elif not text.strip() and not HAS_PDF2IMAGE:
+                 print("PDF text extraction failed: pypdf found no text and pdf2image not installed.")
+
         else:
             # Assume Image
             try:
@@ -65,7 +98,7 @@ def parse_questions_from_text(text: str):
             
             clean_text = re.sub(q_start_pattern, '', line)
             current_q = {
-                "id": str(uuid.uuid4()) if 'uuid' in locals() else f"q{len(questions)+1}", # simple id
+                "id": str(uuid.uuid4()), 
                 "text": clean_text,
                 "options": [],
                 "correct_answer": 0

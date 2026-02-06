@@ -107,10 +107,53 @@ export const StudentExamPage = () => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const [submitting, setSubmitting] = useState(false);
+    const [result, setResult] = useState(null); // { score: 0, total: 0, percentage: 0 }
+
+    // Add effect to verify questions loaded
+    useEffect(() => {
+        if (!loading && questions.length === 0) {
+            console.warn("No questions loaded. Check network or assignment.");
+        }
+    }, [questions, loading]);
+
+    const handleAnswerChange = (qId, optionIndex) => {
+        setAnswers(prev => ({ ...prev, [qId]: optionIndex }));
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        alert("Exam Submitted Successfully!");
-        navigate('/student');
+
+        // 1. Start Loading Animation (10 seconds)
+        setSubmitting(true);
+
+        // Wait 10 seconds artificially as requested
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
+        try {
+            // 2. Submit to Backend
+            const res = await fetch(`${API_BASE_URL}/api/sessions/${id}/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure auth if needed, though backend currently doesn't strictly enforce it on this specific endpoint in my previous edit, but better safe.
+                },
+                body: JSON.stringify({ answers })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setResult(data);
+            } else {
+                console.error("Submission failed");
+                alert("Submission failed. Please try again.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error connecting to server.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // Termination Overlay - Takes precedence
@@ -150,20 +193,53 @@ export const StudentExamPage = () => {
         );
     }
 
+    if (result) {
+        return (
+            <div className="animate-fade-in" style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 9999,
+                backgroundColor: 'var(--bg-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+                <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem', maxWidth: '400px' }}>
+                    <CheckCircle size={64} style={{ color: 'var(--accent-success)', margin: '0 auto 1.5rem' }} />
+                    <h2 style={{ marginBottom: '1rem' }}>Exam Completed</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Your answers have been submitted successfully.</p>
+
+                    <div style={{
+                        background: 'rgba(52, 211, 153, 0.1)',
+                        padding: '2rem',
+                        borderRadius: '16px',
+                        marginBottom: '2rem',
+                        border: '1px solid var(--accent-success)'
+                    }}>
+                        <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--accent-success)' }}>{result.percentage}%</div>
+                        <div style={{ opacity: 0.8 }}>Score: {result.score} / {result.total}</div>
+                    </div>
+
+                    <button className="btn btn-primary" onClick={() => navigate('/student')} style={{ width: '100%', padding: '1rem' }}>Return to Dashboard</button>
+                </div>
+            </div>
+        );
+    }
+
 
     return (
         <div className="animate-fade-in" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 120px)', position: 'relative' }}>
 
             {/* Loading Overlay */}
-            {loading && (
+            {(loading || submitting) && (
                 <div style={{
-                    position: 'absolute',
+                    position: 'fixed',
                     top: 0, left: 0, right: 0, bottom: 0,
-                    zIndex: 50,
-                    backgroundColor: 'var(--bg-primary)', // Matches background to hide content
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    zIndex: 9999,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    backdropFilter: 'blur(5px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
                 }}>
                     <LoadingScreen />
+                    {submitting && <p style={{ marginTop: '2rem', fontSize: '1.2rem', color: 'var(--accent-primary)', animation: 'pulse 2s infinite' }}>Submitting Exam... Please Wait</p>}
                 </div>
             )}
 
@@ -180,24 +256,49 @@ export const StudentExamPage = () => {
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    {questions.map((q, i) => (
-                        <div key={q.id} style={{ marginBottom: '2rem' }}>
-                            <p style={{ fontWeight: 500, marginBottom: '1rem' }}>{i + 1}. {q.text}</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {q.options?.map(opt => (
-                                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                                        <input
-                                            type="radio"
-                                            name={`q${q.id}`}
-                                            onChange={() => setAnswers({ ...answers, [q.id]: opt })}
-                                        />
-                                        <span style={{ opacity: 0.8 }}>{opt}</span>
-                                    </label>
-                                ))}
-                            </div>
+                    {questions.length === 0 && !loading ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            No questions found for this exam. Please contact your administrator.
                         </div>
-                    ))}
-                    <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Submit Exam</button>
+                    ) : (
+                        questions.map((q, i) => (
+                            <div key={q.id} style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                                <p style={{ fontWeight: 500, marginBottom: '1rem', fontSize: '1.1rem' }}>
+                                    <span style={{ color: 'var(--accent-primary)', marginRight: '8px' }}>Q{i + 1}.</span>
+                                    {q.text}
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                    {q.options?.map((opt, optIdx) => (
+                                        <label key={optIdx} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            cursor: 'pointer',
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            background: answers[q.id] === optIdx ? 'rgba(52, 211, 153, 0.1)' : 'transparent',
+                                            border: answers[q.id] === optIdx ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name={`q${q.id}`}
+                                                onChange={() => handleAnswerChange(q.id, optIdx)}
+                                                checked={answers[q.id] === optIdx}
+                                                style={{ accentColor: 'var(--accent-primary)' }}
+                                            />
+                                            <span style={{ opacity: 0.9 }}>{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {questions.length > 0 && (
+                        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem' }}>Submit Exam</button>
+                        </div>
+                    )}
                 </form>
             </div>
 

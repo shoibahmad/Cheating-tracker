@@ -200,6 +200,7 @@ export const AdminDashboard = () => {
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Candidate</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Exam Type</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Status</th>
+                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Action</th>
                                 </tr>
@@ -232,6 +233,9 @@ export const AdminDashboard = () => {
                                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
                                                 {session.status}
                                             </span>
+                                        </td>
+                                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                                            {session.score !== undefined ? `${session.score}%` : 'N/A'}
                                         </td>
                                         <td style={{ padding: '1rem' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

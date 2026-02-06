@@ -32,8 +32,10 @@ export const StudentDashboard = () => {
             fetch(`${API_BASE_URL}/api/sessions?student_name=${encodeURIComponent(studentName)}`)
                 .then(res => res.json())
                 .then(data => {
-                    // Filter for Active or Scheduled exams
-                    const active = data.filter(s => ['Active', 'Scheduled'].includes(s.status));
+                    // Filter for Active, Scheduled, or Completed exams
+                    const active = data.filter(s => ['Active', 'Scheduled', 'Completed'].includes(s.status));
+                    // Sort locally if needed (e.g. Active first)
+                    active.sort((a, b) => (a.status === 'Active' ? -1 : 1));
                     setAssignedExams(active);
                 })
                 .catch(err => console.error("Error fetching assigned exams:", err));
@@ -62,17 +64,38 @@ export const StudentDashboard = () => {
                                         padding: '1rem',
                                         background: 'rgba(255,255,255,0.05)',
                                         borderRadius: '8px',
-                                        borderLeft: '4px solid var(--accent-primary)'
+                                        borderLeft: `4px solid ${exam.status === 'Completed' ? 'var(--accent-success)' : 'var(--accent-primary)'}`
                                     }}>
-                                        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>{exam.exam_type}</div>
-                                        <div style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '1rem' }}>Session ID: {exam.id}</div>
-                                        <button
-                                            onClick={() => navigate(`/student/exam/${exam.id}`)}
-                                            className="btn btn-primary"
-                                            style={{ width: '100%', padding: '0.6rem' }}
-                                        >
-                                            Start Exam
-                                        </button>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>{exam.exam_type}</div>
+                                            {exam.status === 'Completed' && (
+                                                <span style={{ fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--accent-success)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                    Score: {exam.score}%
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '1rem' }}>
+                                            Session ID: {exam.id} <br />
+                                            Status: {exam.status}
+                                        </div>
+
+                                        {exam.status === 'Completed' ? (
+                                            <button
+                                                disabled
+                                                className="btn"
+                                                style={{ width: '100%', padding: '0.6rem', background: 'rgba(255,255,255,0.1)', cursor: 'default' }}
+                                            >
+                                                Exam Completed
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => navigate(`/student/exam/${exam.id}`)}
+                                                className="btn btn-primary"
+                                                style={{ width: '100%', padding: '0.6rem' }}
+                                            >
+                                                Start Exam
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>

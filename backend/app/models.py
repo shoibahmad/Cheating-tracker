@@ -40,3 +40,4 @@ class ExamSession(SQLModel, table=True):
     started_at: datetime
     alerts: List[str] = Field(default=[], sa_type=JSON)
     question_paper_id: Optional[str] = Field(default=None, foreign_key="questionpaper.id")
+    score: float = Field(default=0.0)
