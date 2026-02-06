@@ -152,12 +152,12 @@ export const CreatePaperPage = () => {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div>
                                 <h4 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Auto-Import Questions (OCR)</h4>
-                                <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.7 }}>Upload an image of a question paper to extract questions automatically.</p>
+                                <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.7 }}>Upload an image or PDF of a question paper to extract questions automatically.</p>
                             </div>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     type="file"
-                                    accept="image/*"
+                                    accept="image/*,application/pdf"
                                     onChange={async (e) => {
                                         const file = e.target.files[0];
                                         if (!file) return;

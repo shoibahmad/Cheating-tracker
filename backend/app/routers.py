@@ -179,7 +179,7 @@ async def upload_question_paper(file: UploadFile = File(...)):
         content = await file.read()
         # Basic check for image vs pdf (pdf support needs pypdf or pdf2image, here simple check)
         # For now, support images
-        text = await extract_text_from_image(content)
+        text = await extract_text_from_image(content, filename=file.filename)
         if not text:
             return {"questions": []}
             
@@ -188,6 +188,14 @@ async def upload_question_paper(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail="Failed to process file")
+
+@router.get("/question-papers/{paper_id}", response_model=QuestionPaper)
+def get_question_paper(paper_id: str, session: Session = Depends(get_session)):
+    from sqlalchemy.orm import selectinload
+    paper = session.exec(select(QuestionPaper).where(QuestionPaper.id == paper_id).options(selectinload(QuestionPaper.questions))).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="Question paper not found")
+    return paper
 
 @router.get("/question-papers", response_model=List[QuestionPaper])
 def get_question_papers(session: Session = Depends(get_session)):

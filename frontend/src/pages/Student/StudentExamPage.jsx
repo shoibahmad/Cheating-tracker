@@ -25,13 +25,12 @@ export const StudentExamPage = () => {
 
                 if (sessionData.question_paper_id) {
                     // 2. Get Question Paper
-                    // Ideally we'd have a specific endpoint, but fetching all for now (MVP)
-                    const papersRes = await fetch(`${API_BASE_URL}/api/question-papers`);
-                    const papersData = await papersRes.json();
-                    const paper = papersData.find(p => p.id === sessionData.question_paper_id);
-
-                    if (paper) {
-                        setQuestions(paper.questions || []);
+                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
+                    if (paperRes.ok) {
+                        const paperData = await paperRes.json();
+                        setQuestions(paperData.questions || []);
+                    } else {
+                        console.error("Failed to load question paper");
                     }
                 }
             } catch (err) {

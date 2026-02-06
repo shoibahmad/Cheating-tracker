@@ -2,65 +2,106 @@ import pytesseract
 from PIL import Image
 import io
 import re
+from pdf2image import convert_from_bytes
 
-async def extract_text_from_image(image_bytes: bytes) -> str:
+async def extract_text_from_image(file_bytes: bytes, filename: str = "") -> str:
+    """
+    Extracts text from image bytes or PDF bytes.
+    """
+    text = ""
     try:
-        image = Image.open(io.BytesIO(image_bytes))
-        text = pytesseract.image_to_string(image)
+        # Check if PDF
+        if filename.lower().endswith('.pdf') or file_bytes[:4] == b'%PDF':
+            try:
+                images = convert_from_bytes(file_bytes)
+                for i, image in enumerate(images):
+                    page_text = pytesseract.image_to_string(image)
+                    text += f"\n--- Page {i+1} ---\n{page_text}"
+            except Exception as e:
+                print(f"PDF Conversion Error: {e}")
+                # Fallback or re-raise
+                return ""
+        else:
+            # Assume Image
+            try:
+                image = Image.open(io.BytesIO(file_bytes))
+                text = pytesseract.image_to_string(image)
+            except Exception as e:
+                print(f"Image OCR Error: {e}")
+                return ""
+                
         return text
     except Exception as e:
-        print(f"OCR Error: {e}")
+        print(f"OCR General Error: {e}")
         return ""
 
 def parse_questions_from_text(text: str):
     """
     Parses raw text to find questions and options.
-    Assumes format:
-    1. Question text
-    a) Option A
-    b) Option B ...
+    Supports formats:
+    1. Question... 1) Question... Q1. Question...
+    a) Option... A. Option... (a) Option...
     """
     questions = []
-    # Simple regex to find "1. ", "Q1.", etc.
-    # This is a basic parser and might need refinement based on actual input format
-    # For now, we'll try to split by numbered lines
-    
     lines = text.split('\n')
     current_q = None
     
+    # Regex Patterns
+    # Question start: "1.", "1)", "Q1.", "Q1)"
+    q_start_pattern = r'^(?:Q|q)?\d+[\.\)]\s+'
+    
+    # Option start: "a)", "a.", "(a)", "A)", "A.", "(A)"
+    opt_start_pattern = r'^(?:\([a-dA-D]\)|[a-dA-D][\.\)])\s+'
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
             
-        # Detect Question Start (e.g., "1.", "2)")
-        if re.match(r'^\d+[\.)]', line):
+        # Detect Question Start
+        if re.match(q_start_pattern, line):
             if current_q:
                 questions.append(current_q)
+            
+            clean_text = re.sub(q_start_pattern, '', line)
             current_q = {
-                "id": f"q{len(questions)+1}",
-                "text": re.sub(r'^\d+[\.)]\s*', '', line),
+                "id": str(uuid.uuid4()) if 'uuid' in locals() else f"q{len(questions)+1}", # simple id
+                "text": clean_text,
                 "options": [],
                 "correct_answer": 0
             }
-        # Detect Option (e.g., "a)", "A.", "(a)")
-        elif re.match(r'^[a-dA-D][\.)\)]', line) or re.match(r'^\([a-dA-D]\)', line):
+        
+        # Detect Option
+        elif re.match(opt_start_pattern, line):
             if current_q:
-                opt_text = re.sub(r'^[a-dA-D][\.)\)]\s*|^\([a-dA-D]\)\s*', '', line)
+                clean_opt = re.sub(opt_start_pattern, '', line)
                 if len(current_q["options"]) < 4:
-                    current_q["options"].append(opt_text)
+                    current_q["options"].append(clean_opt)
+        
+        # Continuation of text
         elif current_q:
-            # Append to current question text if not an option and question exists
-            # (unless strictly detecting options)
+            # If we haven't started collecting options yet, append to question text
             if len(current_q["options"]) == 0:
                 current_q["text"] += " " + line
+            else:
+                # If we have options, maybe it's a multiline option? 
+                # For simplicity, append to the last option
+                current_q["options"][-1] += " " + line
             
     if current_q:
         questions.append(current_q)
         
-    # Fill empty options if parsing failed to find 4
+    # Validation & Fill
+    valid_questions = []
     for q in questions:
+        # Filter out junk
+        if len(q["text"]) < 3: 
+            continue
+            
+        # Ensure 4 options
         while len(q["options"]) < 4:
             q["options"].append("")
             
-    return questions
+        valid_questions.append(q)
+            
+    return valid_questions
