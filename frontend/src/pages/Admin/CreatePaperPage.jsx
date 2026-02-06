@@ -148,7 +148,58 @@ export const CreatePaperPage = () => {
 
                 {/* Questions Section */}
                 <div style={{ marginBottom: '2rem' }}>
+                    <div className="glass-card" style={{ marginBottom: '2rem', background: 'rgba(99, 102, 241, 0.05)', border: '1px dashed var(--accent-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div>
+                                <h4 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Auto-Import Questions (OCR)</h4>
+                                <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.7 }}>Upload an image of a question paper to extract questions automatically.</p>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (!file) return;
+
+                                        const toastId = toast.loading("Scanning paper...");
+                                        const formData = new FormData();
+                                        formData.append('file', file);
+
+                                        try {
+                                            const res = await fetch(`${API_BASE_URL}/api/ocr/upload`, {
+                                                method: 'POST',
+                                                body: formData
+                                            });
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                if (data.questions && data.questions.length > 0) {
+                                                    setQuestions(prev => [...prev, ...data.questions]);
+                                                    toast.success(`Imported ${data.questions.length} questions!`, { id: toastId });
+                                                } else {
+                                                    toast.error("No questions found in image", { id: toastId });
+                                                }
+                                            } else {
+                                                toast.error("OCR Failed", { id: toastId });
+                                            }
+                                        } catch (err) {
+                                            console.error(err);
+                                            toast.error("Error uploading file", { id: toastId });
+                                        }
+                                    }}
+                                    style={{
+                                        position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', left: 0, top: 0
+                                    }}
+                                />
+                                <button type="button" className="btn btn-secondary">
+                                    <BookOpen size={16} style={{ marginRight: '8px' }} /> Upload Scan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+
                         <h3 style={{ fontSize: '1.5rem' }}>Questions ({questions.length})</h3>
                         <button
                             type="button"

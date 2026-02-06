@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import List, Annotated
 from sqlmodel import Session, select
@@ -16,6 +16,7 @@ from .auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from pydantic import BaseModel
+from .ocr import extract_text_from_image, parse_questions_from_text
 
 router = APIRouter()
 
@@ -167,6 +168,26 @@ def create_question_paper(
     session.commit()
     session.refresh(new_paper)
     return new_paper
+
+
+@router.post("/ocr/upload")
+async def upload_question_paper(file: UploadFile = File(...)):
+    if not file:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    
+    try:
+        content = await file.read()
+        # Basic check for image vs pdf (pdf support needs pypdf or pdf2image, here simple check)
+        # For now, support images
+        text = await extract_text_from_image(content)
+        if not text:
+            return {"questions": []}
+            
+        questions_data = parse_questions_from_text(text)
+        return {"questions": questions_data, "raw_text": text}
+    except Exception as e:
+        print(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process file")
 
 @router.get("/question-papers", response_model=List[QuestionPaper])
 def get_question_papers(session: Session = Depends(get_session)):

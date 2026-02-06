@@ -22,7 +22,6 @@ export const MonitorSelectionPage = () => {
                 setSessions([
                     { id: "1", student_name: "Alice Johnson", exam_type: "University", status: "Active", trust_score: 98, alerts: [] },
                     { id: "2", student_name: "Bob Smith", exam_type: "Competitive", status: "Flagged", trust_score: 45, alerts: ["Face not found"] },
-                    { id: "3", student_name: "Charlie Brown", exam_type: "Corporate", status: "Active", trust_score: 92, alerts: [] },
                     { id: "4", student_name: "Diana Prince", exam_type: "University", status: "Active", trust_score: 100, alerts: [] },
                 ]);
             } finally {

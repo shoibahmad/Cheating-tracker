@@ -32,8 +32,8 @@ export const StudentDashboard = () => {
             fetch(`${API_BASE_URL}/api/sessions?student_name=${encodeURIComponent(studentName)}`)
                 .then(res => res.json())
                 .then(data => {
-                    // Filter for Active exams that haven't been taken/terminated (logic can be refined)
-                    const active = data.filter(s => s.status === 'Active');
+                    // Filter for Active or Scheduled exams
+                    const active = data.filter(s => ['Active', 'Scheduled'].includes(s.status));
                     setAssignedExams(active);
                 })
                 .catch(err => console.error("Error fetching assigned exams:", err));

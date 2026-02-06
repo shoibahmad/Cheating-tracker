@@ -16,7 +16,6 @@ import { AboutPage } from './pages/AboutPage';
 import { ApiDocsPage } from './pages/ApiDocsPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { InstitutionsPage } from './pages/InstitutionsPage';
-import { CorporatePage } from './pages/CorporatePage';
 import { ExamsPage } from './pages/ExamsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -111,7 +110,6 @@ function App() {
 
           {/* Fallback for other dashboard links */}
           <Route path="/institutions" element={<InstitutionsPage />} />
-          <Route path="/corporate" element={<CorporatePage />} />
           <Route path="/exams" element={<ExamsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />

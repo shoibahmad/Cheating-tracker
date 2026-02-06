@@ -73,7 +73,6 @@ export const CreateExamForm = ({ defaultType = "University", onSuccess }) => {
                     >
                         <option value="University">University Exam</option>
                         <option value="Competitive">Competitive Entrance</option>
-                        <option value="Corporate">Corporate Assessment</option>
                         <option value="Interview">Remote Interview</option>
                     </select>
                 </div>

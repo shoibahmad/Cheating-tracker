@@ -160,7 +160,23 @@ export const MonitorView = ({ session, onBack }) => {
                 ← Back to Dashboard
             </button>
 
-            <div className="grid grid-cols-3" style={{ gridTemplateColumns: '2fr 1fr', height: '100%', gap: '1.5rem' }}>
+            <div className="monitor-grid">
+                <style>{`
+                    .monitor-grid {
+                        display: grid;
+                        grid-template-columns: 2fr 1fr;
+                        gap: 1.5rem;
+                        height: 100%;
+                    }
+                    @media (max-width: 768px) {
+                        .monitor-grid {
+                            grid-template-columns: 1fr;
+                            grid-template-rows: 1fr auto;
+                            height: auto;
+                        }
+                    }
+                `}</style>
+
 
                 {/* Left Column: Video Feed */}
                 <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>

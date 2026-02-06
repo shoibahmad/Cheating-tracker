@@ -107,7 +107,7 @@ export const SignupPage = () => {
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Organization</label>
-                        <input type="text" name="organization" onChange={handleChange} className="glass-input" placeholder="University / Company" required />
+                        <input type="text" name="organization" onChange={handleChange} className="glass-input" placeholder="University / Institute" required />
                     </div>
 
                     <div style={{ marginBottom: '2rem' }}>
