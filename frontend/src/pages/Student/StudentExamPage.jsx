@@ -117,26 +117,39 @@ export const StudentExamPage = () => {
     if (terminated) {
         return (
             <div className="animate-fade-in" style={{
-                height: 'calc(100vh - 100px)',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 9999,
+                backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                backdropFilter: 'blur(10px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'column'
             }}>
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px', border: '1px solid var(--accent-alert)' }}>
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px', border: '1px solid var(--accent-alert)', boxShadow: '0 0 50px rgba(220, 38, 38, 0.3)' }}>
                     <div style={{ color: 'var(--accent-alert)', marginBottom: '1rem' }}>
                         <AlertTriangle size={64} style={{ margin: '0 auto' }} />
                     </div>
-                    <h2 style={{ color: 'var(--accent-alert)', marginBottom: '1rem' }}>EXAM TERMINATED</h2>
+                    <h2 style={{ color: 'var(--accent-alert)', marginBottom: '1rem', fontSize: '2rem' }}>SESSION TERMINATED</h2>
                     <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
-                        Violation Detected: <strong>{terminationReason}</strong>. <br />
-                        Your session has been recorded and submitted for audit.
+                        The system has detected a critical violation of exam protocols.
                     </p>
-                    <button className="btn btn-secondary" onClick={() => navigate('/student')}>Back to Home</button>
+
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem' }}>
+                        <p style={{ margin: 0, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.7 }}>Reason</p>
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.2rem', fontWeight: 'bold' }}>{terminationReason}</p>
+                    </div>
+
+                    <button className="btn btn-secondary" onClick={() => navigate('/student')} style={{ width: '100%', padding: '1rem' }}>Return to Dashboard</button>
                 </div>
             </div>
         );
     }
+
 
     return (
         <div className="animate-fade-in" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 120px)', position: 'relative' }}>

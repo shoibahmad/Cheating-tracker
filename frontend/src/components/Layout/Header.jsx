@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Menu, Bell, User } from 'lucide-react';
 import { ProfileDrawer } from './ProfileDrawer';
 
-export const Header = ({ title }) => {
+export const Header = ({ title, onToggleSidebar }) => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const userName = localStorage.getItem('user_name') || 'Guest';
 
@@ -17,6 +17,13 @@ export const Header = ({ title }) => {
                 padding: '0 2rem'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button
+                        className="btn btn-secondary mobile-menu-btn"
+                        onClick={onToggleSidebar}
+                        style={{ padding: '0.6rem', borderRadius: '8px' }}
+                    >
+                        <Menu size={24} />
+                    </button>
                     <h1 style={{ marginBottom: 0, fontSize: '2rem' }}>{title || 'SecureEval'}</h1>
                 </div>
 

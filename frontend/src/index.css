@@ -2,15 +2,19 @@
   --bg-primary: #020617;
   --bg-secondary: #0f172a;
   /* Added */
+  /* Updated Theme: Green Dominant */
   --bg-tertiary: #1e293b;
-  /* Added */
-  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, transparent 50%),
-    radial-gradient(circle at 100% 0%, #312e81 0%, transparent 30%);
-  --accent-primary: #6366f1;
-  /* Indigo */
-  --accent-secondary: #a855f7;
-  /* Purple */
-  --accent-success: #10b981;
+  /* Updated Gradients to Green/Teal */
+  --bg-gradient: radial-gradient(circle at 50% 0%, #064e3b 0%, transparent 50%),
+    radial-gradient(circle at 100% 0%, #115e59 0%, transparent 30%);
+
+  --accent-primary: #10b981;
+  /* Emerald 500 */
+  --accent-secondary: #14b8a6;
+  /* Teal 500 */
+
+  --accent-success: #22c55e;
+  /* Green 500 for success state */
   --accent-alert: #f43f5e;
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
@@ -170,6 +174,17 @@ p {
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(20px);
   border-right: 1px solid var(--glass-border);
+  /* Added from inline styles */
+  width: 260px;
+  min-width: 260px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  z-index: 50;
 }
 
 .nav-item {
@@ -239,12 +254,49 @@ p {
   }
 
   .sidebar {
-    width: 0;
-    padding: 0;
-    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 100;
   }
 
-  /* Mobile menu logic would go here ideally */
+  .sidebar.open {
+    width: 260px;
+    transform: translateX(0);
+    padding: 1.5rem;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+    margin-right: 1rem;
+  }
+}
+
+.mobile-menu-btn {
+  display: none;
 }
 
 .animate-fade-in {

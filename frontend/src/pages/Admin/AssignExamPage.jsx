@@ -15,6 +15,12 @@ import {
 export const AssignExamPage = () => {
     const navigate = useNavigate();
 
+    const [papers, setPapers] = useState([]);
+    const [selectedPaper, setSelectedPaper] = useState('');
+    const [studentName, setStudentName] = useState('');
+    const [examType, setExamType] = useState('University');
+    const [generatedSession, setGeneratedSession] = useState(null);
+    const [loading, setLoading] = useState(false);
     const [students, setStudents] = useState([]);
 
     useEffect(() => {

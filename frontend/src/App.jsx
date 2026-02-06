@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
@@ -33,6 +33,8 @@ import { Toaster } from 'react-hot-toast';
 // Layouts
 const DashboardLayout = () => {
   const location = useLocation();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const getTitle = () => {
     if (location.pathname.startsWith('/dashboard')) return 'Overview';
     if (location.pathname.startsWith('/monitor')) return 'Live Monitoring';
@@ -49,11 +51,11 @@ const DashboardLayout = () => {
 
       {/* Conditionally render Sidebar only for dashboard routes if desired, or always */}
       {!location.pathname.startsWith('/student') && !['/', '/login', '/signup', '/about'].includes(location.pathname) && (
-        <Sidebar />
+        <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
       )}
 
       <div className="main-content" style={{ flex: 1, overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Header title={getTitle()} />
+        <Header title={getTitle()} onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
         <div style={{ paddingBottom: '2rem', flex: 1 }}>
           <Outlet />
         </div>
