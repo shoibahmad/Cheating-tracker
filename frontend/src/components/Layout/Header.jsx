@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Menu, Bell, User } from 'lucide-react';
 import { ProfileDrawer } from './ProfileDrawer';
+import { useAuth } from '../../context/AuthContext';
 
 export const Header = ({ title, onToggleSidebar }) => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const userName = localStorage.getItem('user_name') || 'Guest';
+    const { currentUser } = useAuth();
+
+    // Fallback if not loaded, but should be prevented by route guard
+    const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
 
     return (
         <>

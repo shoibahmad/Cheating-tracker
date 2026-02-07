@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
 import { User, Mail, Lock, ArrowRight, Building, GraduationCap, Shield } from 'lucide-react';
+import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, deleteUser } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db, googleProvider } from '../firebase';
+import toast from 'react-hot-toast';
 
 export const SignupPage = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [showRoleModal, setShowRoleModal] = useState(false);
+    const [googleUser, setGoogleUser] = useState(null);
+    const { refreshUser } = useAuth();
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -19,37 +25,143 @@ export const SignupPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleGoogleSignup = async () => {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const user = result.user;
+
+            // Check if user already exists
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+
+            if (userDoc.exists()) {
+                // User exists, just log them in
+                const userData = userDoc.data();
+                toast.success(`Welcome back ${userData.full_name}!`);
+                if (userData.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else {
+                    navigate('/student/dashboard');
+                }
+            } else {
+                // User does not exist, ask for role
+                setGoogleUser(user);
+                setShowRoleModal(true);
+            }
+
+        } catch (error) {
+            console.error("Google Signup Error:", error);
+            toast.error(error.message);
+        }
+    };
+
+    const confirmGoogleRole = async (selectedRole) => {
+        if (!googleUser) return;
+
+        try {
+            await setDoc(doc(db, "users", googleUser.uid), {
+                email: googleUser.email,
+                full_name: googleUser.displayName,
+                role: selectedRole,
+                institution: '',
+                createdAt: new Date().toISOString()
+            });
+
+            toast.success("Account created successfully!");
+            if (selectedRole === 'admin') {
+                navigate('/admin/dashboard');
+            } else {
+                navigate('/student/dashboard');
+            }
+        } catch (error) {
+            console.error("Error creating user doc:", error);
+            toast.error("Failed to create account profile.");
+            // Optionally delete auth user if doc creation fails to keep clean state
+            // await deleteUser(googleUser); 
+        } finally {
+            setShowRoleModal(false);
+            setGoogleUser(null);
+        }
+    };
+
     const handleSignup = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password,
-                    full_name: `${formData.first_name} ${formData.last_name}`,
-                    role: formData.role,
-                    institution: formData.organization
-                })
+            const { email, password, first_name, last_name, role, organization } = formData;
+            const full_name = `${first_name} ${last_name}`;
+
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            await updateProfile(user, {
+                displayName: full_name
             });
 
-            if (res.ok) {
-                alert("Account created successfully! Please login.");
-                navigate('/login');
-            } else {
-                const data = await res.json();
-                alert(data.detail || "Signup failed");
-            }
+            await setDoc(doc(db, "users", user.uid), {
+                email: email,
+                full_name: full_name,
+                role: role,
+                institution: organization,
+                createdAt: new Date().toISOString()
+            });
+
+            toast.success("Account created successfully!");
+            navigate('/login');
+
         } catch (err) {
             console.error(err);
-            alert("Error connecting to server");
+            toast.error(err.message || "Signup failed");
         } finally {
             setLoading(false);
         }
     };
+
+    if (showRoleModal) {
+        return (
+            <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+                <div className="glass-card animate-fade-in" style={{ padding: '3rem', maxWidth: '500px', width: '90%', textAlign: 'center' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Select Your Role</h2>
+                    <p style={{ marginBottom: '2rem', opacity: 0.8 }}>Please select how you will use SecureEval.</p>
+
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                        <div
+                            className="glass-panel"
+                            onClick={() => confirmGoogleRole('student')}
+                            style={{
+                                flex: 1, padding: '1.5rem', cursor: 'pointer', textAlign: 'center',
+                                border: '1px solid var(--glass-border)',
+                                transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--glass-border)'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <GraduationCap size={32} style={{ marginBottom: '1rem', color: 'var(--accent-primary)' }} />
+                            <div style={{ fontWeight: 600 }}>Student</div>
+                        </div>
+                        <div
+                            className="glass-panel"
+                            onClick={() => confirmGoogleRole('admin')}
+                            style={{
+                                flex: 1, padding: '1.5rem', cursor: 'pointer', textAlign: 'center',
+                                border: '1px solid var(--glass-border)',
+                                transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-success)'; e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--glass-border)'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <Shield size={32} style={{ marginBottom: '1rem', color: 'var(--accent-success)' }} />
+                            <div style={{ fontWeight: 600 }}>Admin</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 0' }}>
@@ -57,6 +169,31 @@ export const SignupPage = () => {
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Create Account</h2>
                     <p>Get started with secure evaluation monitoring</p>
+                </div>
+
+                <button
+                    onClick={handleGoogleSignup}
+                    className="btn"
+                    style={{
+                        width: '100%',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        background: 'white',
+                        color: '#333',
+                        border: '1px solid #ddd'
+                    }}
+                >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '20px', height: '20px' }} />
+                    Sign up with Google
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }}></div>
+                    <span style={{ padding: '0 10px', opacity: 0.5, fontSize: '0.9rem' }}>OR</span>
+                    <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }}></div>
                 </div>
 
                 <form onSubmit={handleSignup}>

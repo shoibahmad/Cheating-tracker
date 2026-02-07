@@ -103,8 +103,10 @@ export const MonitorView = ({ session, onBack }) => {
 
     // ... handleTerminate ...
 
+    // ... handleTerminate ...
+
     return (
-        <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', padding: '1rem' }}>
             {/* Custom Termination Modal Overlay */}
             {showTerminationModal && (
                 <div style={{
@@ -156,9 +158,17 @@ export const MonitorView = ({ session, onBack }) => {
                 </div>
             )}
 
-            <button onClick={onBack} className="btn btn-secondary" style={{ marginBottom: '1rem' }}>
-                ← Back to Dashboard
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                <button onClick={onBack} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Archive size={16} /> Back to Dashboard
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className={`live-dot ${cameraActive ? '' : 'offline'}`} />
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cameraActive ? 'LIVE MONITORING' : 'CONNECTING...'}</span>
+                    </div>
+                </div>
+            </div>
 
             <div className="monitor-grid">
                 <style>{`
@@ -166,217 +176,190 @@ export const MonitorView = ({ session, onBack }) => {
                         display: grid;
                         grid-template-columns: 2fr 1fr;
                         gap: 1.5rem;
-                        height: 100%;
+                        height: calc(100% - 60px);
                     }
-                    @media (max-width: 768px) {
+                    @media (max-width: 900px) {
                         .monitor-grid {
                             grid-template-columns: 1fr;
                             grid-template-rows: 1fr auto;
                             height: auto;
                         }
                     }
+                    .glass-panel {
+                        background: rgba(255, 255, 255, 0.03);
+                        border: 1px solid rgba(255, 255, 255, 0.05);
+                        backdrop-filter: blur(10px);
+                        border-radius: 16px;
+                    }
                 `}</style>
 
 
                 {/* Left Column: Video Feed */}
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-                    <div className="live-feed" style={{ flex: 1, borderRadius: 0, border: 'none', position: 'relative' }}>
+                <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
 
-                        {/* Red Screen Overlay */}
+                    {/* Red Screen Overlay */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(239, 68, 68, 0.4)',
+                        zIndex: 20,
+                        display: alertState ? 'flex' : 'none',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backdropFilter: 'blur(4px)',
+                        border: '4px solid var(--accent-alert)'
+                    }}>
                         <div style={{
-                            position: 'absolute',
-                            top: 0, left: 0, right: 0, bottom: 0,
-                            background: 'rgba(239, 68, 68, 0.4)',
-                            zIndex: 20,
-                            display: alertState ? 'flex' : 'none',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backdropFilter: 'blur(2px)',
-                            border: '5px solid red'
+                            background: 'rgba(0,0,0,0.8)',
+                            color: 'var(--accent-alert)',
+                            padding: '1rem 2rem',
+                            fontWeight: 'bold',
+                            fontSize: '1.5rem',
+                            borderRadius: '12px',
+                            border: '1px solid var(--accent-alert)',
+                            display: 'flex', alignItems: 'center', gap: '1rem'
                         }}>
-                            <div style={{ background: 'red', color: 'white', padding: '1rem 2rem', fontWeight: 'bold', fontSize: '1.5rem', borderRadius: '8px' }}>
-                                ANOMALY DETECTED
-                            </div>
+                            <AlertTriangle size={32} /> ANOMALY DETECTED
                         </div>
+                    </div>
 
-                        <div className="live-badge" style={{ zIndex: 10 }}>
-                            <div className={`live-dot ${cameraActive ? '' : 'offline'}`} /> {cameraActive ? 'LIVE' : 'CONNECTING...'}
-                        </div>
+                    {/* Video Element */}
+                    <div style={{
+                        width: '100%',
+                        height: '100%',
+                        background: '#000',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                transform: 'scaleX(-1)', // Mirror effect
+                                opacity: cameraActive ? 1 : 0.5
+                            }}
+                        />
 
-                        {/* Video Element */}
-                        <div style={{
-                            width: '100%',
-                            height: '100%',
-                            background: '#000',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}>
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover',
-                                    transform: 'scaleX(-1)' // Mirror effect
-                                }}
-                            />
-
-                            {/* Fallback pattern if camera fails or loading */}
-                            {!cameraActive && (
-                                <div style={{
-                                    position: 'absolute',
-                                    top: 0, left: 0, right: 0, bottom: 0,
-                                    background: 'linear-gradient(45deg, #0f172a, #1e293b)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <p style={{ color: 'white' }}>Requesting Camera Access...</p>
-                                </div>
-                            )}
-
-                            {/* Grid Overlay */}
+                        {/* Fallback pattern if camera fails or loading */}
+                        {!cameraActive && (
                             <div style={{
                                 position: 'absolute',
                                 top: 0, left: 0, right: 0, bottom: 0,
-                                backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
-                                backgroundSize: '40px 40px',
-                                pointerEvents: 'none'
-                            }} />
-                        </div>
-
-                        {/* Face Box Overlay Simulation (Keep purely decorative for now, or could map to face-api if added) */}
-                        <div style={{
-                            position: 'absolute',
-                            top: '20%',
-                            left: '30%',
-                            width: '40%',
-                            height: '50%',
-                            border: `2px solid ${score > 50 ? 'var(--accent-success)' : 'var(--accent-alert)'}`,
-                            borderRadius: '8px',
-                            transition: 'border-color 0.3s',
-                            boxShadow: score > 50 ? '0 0 20px rgba(16, 185, 129, 0.2)' : '0 0 20px rgba(239, 68, 68, 0.2)',
-                            pointerEvents: 'none'
-                        }}>
-                            {/* ... (labels) ... */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '-25px',
-                                left: '0',
-                                background: score > 50 ? 'var(--accent-success)' : 'var(--accent-alert)',
-                                color: 'white',
-                                padding: '2px 8px',
-                                fontSize: '0.75rem',
-                                borderRadius: '4px',
-                                fontWeight: 'bold',
-                                textTransform: 'uppercase',
-                                letterSpacing: '1px'
+                                background: 'linear-gradient(45deg, #0f172a, #1e293b)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'column',
+                                gap: '1rem'
                             }}>
-                                {score > 50 ? 'Verified Subject' : 'Suspicious Activity'}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Scanning Line */}
-                    <div style={{
-                        width: '100%',
-                        height: '2px',
-                        background: score > 50 ? 'var(--accent-success)' : 'var(--accent-alert)',
-                        position: 'absolute',
-                        top: '0',
-                        animation: 'scan 3s ease-in-out infinite',
-                        opacity: 0.7,
-                        boxShadow: `0 0 10px ${score > 50 ? 'var(--accent-success)' : 'var(--accent-alert)'}`
-                    }} />
-                    <style>{`
-                   @keyframes scan {
-                       0% { top: 0%; opacity: 0; }
-                       10% { opacity: 1; }
-                       90% { opacity: 1; }
-                       100% { top: 100%; opacity: 0; }
-                   }
-               `}</style>
-                </div>
-            </div>
-
-            {/* Right Column: Analysis & Logs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
-
-                {/* Score Card */}
-                <div className="glass-card" style={{ flex: '0 0 auto', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <h3 style={{ marginBottom: '0.5rem', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)' }}>Real-time Trust Score</h3>
-                    <div style={{
-                        fontSize: '4rem',
-                        fontWeight: '800',
-                        color: score > 70 ? 'var(--accent-success)' : score > 40 ? '#fbbf24' : 'var(--accent-alert)',
-                        lineHeight: 1
-                    }}>
-                        {score}%
-                    </div>
-
-                    {/* Mini Graph Placeholder */}
-                    <div style={{ display: 'flex', alignItems: 'end', height: '40px', gap: '4px', justifyContent: 'center', marginTop: '1rem', opacity: 0.5 }}>
-                        {[40, 60, 50, 70, 80, score, score - 5, score + 5, score].map((h, i) => (
-                            <div key={i} style={{
-                                width: '6px',
-                                height: `${h / 2}px`,
-                                background: score > 50 ? 'var(--accent-success)' : 'var(--accent-alert)',
-                                borderRadius: '3px'
-                            }} />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Logs */}
-                <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Alert Log</h3>
-                    <div style={{
-                        flex: 1,
-                        overflowY: 'auto',
-                        paddingRight: '10px'
-                    }}>
-                        {logs.length === 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', opacity: 0.6 }}>
-                                <Archive size={40} style={{ marginBottom: '1rem' }} />
-                                <p>No anomalies detected yet.</p>
+                                <div className="spinner" />
+                                <p style={{ color: 'var(--text-secondary)' }}>Initializing Secure Feed...</p>
                             </div>
                         )}
 
-                        {logs.map((log, i) => (
-                            <div className="animate-fade-in" key={i} style={{
-                                padding: '12px',
-                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'start',
-                                gap: '12px',
-                                background: 'rgba(0,0,0,0.1)',
-                                borderRadius: '8px',
-                                marginBottom: '8px'
-                            }}>
-                                <div style={{
-                                    marginTop: '2px',
-                                    padding: '4px',
-                                    background: 'rgba(239, 68, 68, 0.1)',
-                                    borderRadius: '4px',
-                                    color: 'var(--accent-alert)'
-                                }}>
-                                    <AlertTriangle size={14} />
-                                </div>
-                                <div>
-                                    <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{log.split(']')[1]}</div>
-                                    <div style={{ fontSize: '0.75rem', marginTop: '2px', opacity: 0.7 }}>{log.split(']')[0].replace('[', '')}</div>
-                                </div>
+                        {/* Grid Overlay */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
+                            backgroundSize: '50px 50px',
+                            pointerEvents: 'none'
+                        }} />
+
+                        {/* HUD overlay elements */}
+                        <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '10px' }}>
+                            <div style={{ padding: '4px 8px', background: 'rgba(0,0,0,0.5)', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--accent-success)' }}>
+                                REC ●
                             </div>
-                        ))}
+                            <div style={{ padding: '4px 8px', background: 'rgba(0,0,0,0.5)', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                                720p HD
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Analysis & Logs */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
+
+                    {/* Score Card */}
+                    <div className="glass-panel" style={{ flex: '0 0 auto', padding: '2rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                        <h3 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--text-secondary)', fontWeight: 600 }}>Trust Score</h3>
+                        <div style={{
+                            fontSize: '4.5rem',
+                            fontWeight: '800',
+                            color: score > 70 ? 'var(--accent-success)' : score > 40 ? '#fbbf24' : 'var(--accent-alert)',
+                            lineHeight: 1,
+                            textShadow: `0 0 30px ${score > 70 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                        }}>
+                            {score}%
+                        </div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: score > 70 ? 'var(--accent-success)' : 'var(--accent-alert)' }}>
+                            {score > 70 ? 'Session Secure' : 'High Risk Detected'}
+                        </div>
+
+                        {/* Mini Graph Placeholder */}
+                        <div style={{ display: 'flex', alignItems: 'end', height: '30px', gap: '6px', justifyContent: 'center', marginTop: '1.5rem', opacity: 0.3 }}>
+                            {[40, 60, 50, 70, 80, 85, 60, 90, score].map((h, i) => (
+                                <div key={i} style={{
+                                    width: '4px',
+                                    height: `${h / 3}px`,
+                                    background: 'white',
+                                    borderRadius: '2px'
+                                }} />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Logs */}
+                    <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Activity Log</h3>
+                            <button onClick={simulateCheat} style={{ fontSize: '0.8rem', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)', borderRadius: '4px', cursor: 'pointer' }}>Test Alert</button>
+                        </div>
+
+                        <div style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            paddingRight: '4px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem'
+                        }}>
+                            {logs.length === 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', opacity: 0.5 }}>
+                                    <Eye size={32} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                    <p style={{ fontSize: '0.9rem' }}>Monitoring started...</p>
+                                </div>
+                            )}
+
+                            {logs.map((log, i) => (
+                                <div className="animate-fade-in" key={i} style={{
+                                    padding: '10px 14px',
+                                    borderLeft: '3px solid var(--accent-alert)',
+                                    fontSize: '0.9rem',
+                                    color: 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.05), transparent)',
+                                    borderRadius: '0 8px 8px 0',
+                                }}>
+                                    <AlertTriangle size={16} color="var(--accent-alert)" />
+                                    <div>
+                                        <span style={{ color: 'var(--text-primary)', fontWeight: '500', marginRight: '8px' }}>{log.split(']')[1]}</span>
+                                        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{log.split(']')[0].replace('[', '')}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
     );
 };

@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from '../../firebase';
 import {
     BarChart,
     Bar,
@@ -51,24 +53,36 @@ export const AdminDashboard = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Fetch stats
-                const statsRes = await fetch(`${API_BASE_URL}/api/dashboard-stats`);
-                const statsData = await statsRes.json();
+                // Fetch stats from Firestore collections directly
+                // 1. Sessions
+                const sessionsSnapshot = await getDocs(collection(db, "sessions"));
+                const sessionsList = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Fetch sessions
-                const sessRes = await fetch(`${API_BASE_URL}/api/sessions`);
-                const sessData = await sessRes.json();
+                // 2. Students (Users with role='student')
+                const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+                const totalStudents = usersSnapshot.size;
 
-                setSessions(sessData);
+                // Calculate Stats
+                const active = sessionsList.filter(s => s.status === 'Active').length;
+                const flagged = sessionsList.filter(s => s.status === 'Flagged').length;
+                const totalExams = sessionsList.length;
+
+                // Calculate Average Score (only from Completed sessions with scores)
+                const completedSessions = sessionsList.filter(s => s.score !== undefined);
+                const avgScore = completedSessions.length > 0
+                    ? Math.round(completedSessions.reduce((acc, curr) => acc + (curr.score || 0), 0) / completedSessions.length)
+                    : 0;
+
+                setSessions(sessionsList); // For the table
                 setStats({
-                    active: statsData.active_exams,
-                    flagged: statsData.flagged_exams,
-                    total_students: statsData.total_students,
-                    avg_score: statsData.average_trust_score,
-                    total_exams: statsData.total_exams_today
+                    active,
+                    flagged,
+                    total_students: totalStudents,
+                    avg_score: avgScore,
+                    total_exams: totalExams
                 });
             } catch (err) {
-                console.error(err);
+                console.error("Error loading dashboard data:", err);
             }
         };
         loadData();

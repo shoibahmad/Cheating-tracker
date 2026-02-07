@@ -1,19 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../../config';
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from '../../firebase'; // Adjust path if needed
+import { useAuth } from '../../context/AuthContext';
 
 export const StudentDashboard = () => {
     const navigate = useNavigate();
     const [sessionId, setSessionId] = useState('');
     const [papers, setPapers] = useState([]);
-    const studentName = localStorage.getItem('user_name') || 'Student';
+    const { currentUser } = useAuth();
+    const studentName = currentUser?.displayName || 'Student';
 
     useEffect(() => {
-        // Fetch valid papers for "Sample" section
-        fetch(`${API_BASE_URL}/api/question-papers`)
-            .then(res => res.json())
-            .then(data => setPapers(data))
-            .catch(err => console.error(err));
+        const fetchPapers = async () => {
+            try {
+                // Fetch valid papers from 'exams' collection
+                const q = query(collection(db, "exams"));
+                const querySnapshot = await getDocs(q);
+                const papersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setPapers(papersList);
+            } catch (err) {
+                console.error("Error fetching papers:", err);
+            }
+        };
+        fetchPapers();
     }, []);
 
     const handleStartExam = (e) => {
@@ -28,19 +36,25 @@ export const StudentDashboard = () => {
 
     // Auto-fetch assigned exams
     useEffect(() => {
-        if (studentName) {
-            fetch(`${API_BASE_URL}/api/sessions?student_name=${encodeURIComponent(studentName)}`)
-                .then(res => res.json())
-                .then(data => {
-                    // Filter for Active, Scheduled, or Completed exams
-                    const active = data.filter(s => ['Active', 'Scheduled', 'Completed'].includes(s.status));
-                    // Sort locally if needed (e.g. Active first)
+        const fetchAssigned = async () => {
+            if (currentUser?.uid) {
+                try {
+                    // Assuming 'sessions' collection has a 'studentId' or 'student_name' field
+                    // Better to query by ID
+                    const q = query(collection(db, "sessions"), where("studentId", "==", currentUser.uid));
+                    const querySnapshot = await getDocs(q);
+                    const sessions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    const active = sessions.filter(s => ['Active', 'Scheduled', 'Completed'].includes(s.status));
                     active.sort((a, b) => (a.status === 'Active' ? -1 : 1));
                     setAssignedExams(active);
-                })
-                .catch(err => console.error("Error fetching assigned exams:", err));
-        }
-    }, [studentName]);
+                } catch (err) {
+                    console.error("Error fetching assigned exams:", err);
+                }
+            }
+        };
+        fetchAssigned();
+    }, [currentUser]);
 
     return (
         <div className="container" style={{ maxWidth: '1000px' }}>

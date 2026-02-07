@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
-
-
+import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db, googleProvider } from '../firebase';
 import toast from 'react-hot-toast';
 
 export const LoginPage = () => {
@@ -13,40 +13,80 @@ export const LoginPage = () => {
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+    const handleGoogleLogin = async () => {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const user = result.user;
+
+            // Check role in Firestore
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            let role = 'student';
+
+            if (userDoc.exists()) {
+                role = userDoc.data().role;
+            } else {
+                // If user doesn't exist in Firestore (e.g. first time logging in via Google without signup), create them
+                await setDoc(doc(db, "users", user.uid), {
+                    email: user.email,
+                    full_name: user.displayName,
+                    role: 'student',
+                    institution: '',
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            localStorage.setItem('token', user.accessToken);
+            localStorage.setItem('role', role);
+            localStorage.setItem('user_name', user.displayName);
+
+            toast.success('Successfully logged in!');
+
+            if (role === 'admin') {
+                navigate('/admin/dashboard');
+            } else {
+                navigate('/student/dashboard');
+            }
+
+        } catch (error) {
+            console.error("Google Login Error:", error);
+            toast.error(error.message);
+        }
+    };
+
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const formBody = new URLSearchParams();
-            formBody.append('username', formData.email);
-            formBody.append('password', formData.password);
+            const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+            const user = userCredential.user;
 
-            const res = await fetch(`${API_BASE_URL}/api/auth/token`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formBody
-            });
+            // Get user role from Firestore
+            const userDoc = await getDoc(doc(db, "users", user.uid));
 
-            if (res.ok) {
-                const data = await res.json();
-                localStorage.setItem('token', data.access_token);
-                localStorage.setItem('role', data.role);
-                localStorage.setItem('user_name', data.name);
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                const role = userData.role;
+                const name = userData.full_name;
+
+                localStorage.setItem('token', await user.getIdToken());
+                localStorage.setItem('role', role);
+                localStorage.setItem('user_name', name);
 
                 toast.success('Successfully logged in!');
 
-                if (data.role === 'admin') {
+                if (role === 'admin') {
                     navigate('/admin/dashboard');
                 } else {
                     navigate('/student/dashboard');
                 }
             } else {
-                toast.error("Invalid email or password");
+                toast.error("User data not found in database.");
             }
+
         } catch (err) {
             console.error(err);
-            toast.error("Login failed");
+            toast.error("Invalid email or password");
         } finally {
             setLoading(false);
         }
@@ -58,6 +98,31 @@ export const LoginPage = () => {
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Welcome Back</h2>
                     <p>Sign in to continue monitoring</p>
+                </div>
+
+                <button
+                    onClick={handleGoogleLogin}
+                    className="btn"
+                    style={{
+                        width: '100%',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        background: 'white',
+                        color: '#333',
+                        border: '1px solid #ddd'
+                    }}
+                >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '20px', height: '20px' }} />
+                    Sign in with Google
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }}></div>
+                    <span style={{ padding: '0 10px', opacity: 0.5, fontSize: '0.9rem' }}>OR</span>
+                    <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }}></div>
                 </div>
 
                 <form onSubmit={handleLogin}>

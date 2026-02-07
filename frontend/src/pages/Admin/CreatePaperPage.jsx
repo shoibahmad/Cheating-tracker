@@ -14,8 +14,13 @@ import {
     ArrowLeft
 } from 'lucide-react';
 
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from '../../firebase';
+import { useAuth } from '../../context/AuthContext';
+
 export const CreatePaperPage = () => {
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     const [title, setTitle] = useState('');
     const [subject, setSubject] = useState('');
     const [questions, setQuestions] = useState([
@@ -57,31 +62,31 @@ export const CreatePaperPage = () => {
             return;
         }
 
-        const paper = {
-            title,
-            subject,
-            questions: questions.map(q => ({
-                text: q.text,
-                options: q.options,
-                correct_answer: q.correct_answer
-            }))
-        };
+        const toastId = toast.loading("Saving paper...");
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/question-papers`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(paper)
-            });
-            if (res.ok) {
-                toast.success('Question Paper Created Successfully!');
-                navigate('/admin/dashboard');
-            } else {
-                toast.error('Failed to create paper');
-            }
+            const paper = {
+                title,
+                subject,
+                questions: questions.map(q => ({
+                    text: q.text,
+                    options: q.options,
+                    correct_answer: q.correct_answer
+                })),
+                createdAt: serverTimestamp(),
+                createdBy: currentUser ? currentUser.uid : 'admin',
+                totalQuestions: questions.length,
+                status: 'draft' // or 'published'
+            };
+
+            await addDoc(collection(db, "exams"), paper);
+
+            toast.success('Question Paper Created Successfully!', { id: toastId });
+            navigate('/admin/dashboard');
+
         } catch (err) {
             console.error(err);
-            toast.error('Error creating paper');
+            toast.error('Error creating paper: ' + err.message, { id: toastId });
         }
     };
 
@@ -173,9 +178,34 @@ export const CreatePaperPage = () => {
                                             });
                                             if (res.ok) {
                                                 const data = await res.json();
+
+                                                if (data.status === 'error') {
+                                                    toast.error(`OCR Error: ${data.message}`, { id: toastId });
+                                                    return;
+                                                }
+
                                                 if (data.questions && data.questions.length > 0) {
-                                                    setQuestions(prev => [...prev, ...data.questions]);
+                                                    // Map Gemini questions to our state format
+                                                    const formattedQuestions = data.questions.map((q, idx) => ({
+                                                        id: `q${Date.now()}_${idx}`,
+                                                        text: q.text,
+                                                        options: q.options ? q.options.map(o => o.text || o) : ['', '', '', ''],
+                                                        correct_answer: q.correctAnswer ? (['a', 'b', 'c', 'd'].indexOf(q.correctAnswer.toLowerCase())) : 0
+                                                    }));
+
+                                                    setQuestions(prev => {
+                                                        // If the first question is empty/default, replace it
+                                                        if (prev.length === 1 && !prev[0].text) {
+                                                            return formattedQuestions;
+                                                        }
+                                                        return [...prev, ...formattedQuestions];
+                                                    });
+
                                                     toast.success(`Imported ${data.questions.length} questions!`, { id: toastId });
+
+                                                    if (data.insights) {
+                                                        toast(data.insights, { icon: '🤖', duration: 5000 });
+                                                    }
                                                 } else {
                                                     toast.error("No questions found in image", { id: toastId });
                                                 }

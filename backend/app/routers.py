@@ -1,370 +1,61 @@
-from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
-from fastapi.security import OAuth2PasswordRequestForm
-from typing import List, Annotated
-from sqlmodel import Session, select
-from datetime import datetime, timedelta
-import uuid
-
-from .database import get_session
-from .models import ExamSession, QuestionPaper, Question, User
-from .auth import (
-    get_password_hash, 
-    verify_password, 
-    create_access_token, 
-    get_current_user, 
-    get_current_admin,
-    ACCESS_TOKEN_EXPIRE_MINUTES
-)
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from .ocr import extract_text_from_image, parse_questions_from_text
-
-router = APIRouter()
-
-# --- Auth Routes ---
-
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    full_name: str
-    role: str = "student"
-    institution: str = None
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    role: str
-    name: str
-
-@router.post("/auth/signup", response_model=User)
-def signup(user: UserCreate, session: Session = Depends(get_session)):
-    statement = select(User).where(User.email == user.email)
-    existing_user = session.exec(statement).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    new_user = User(
-        email=user.email,
-        password_hash=hashed_password,
-        full_name=user.full_name,
-        role=user.role,
-        institution=user.institution
-    )
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
-    return new_user
-
-@router.post("/auth/token", response_model=Token)
-def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    session: Session = Depends(get_session)
-):
-    statement = select(User).where(User.email == form_data.username) # OAuth2 form uses 'username' for email
-    user = session.exec(statement).first()
-    
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role}, expires_delta=access_token_expires
-    )
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer", 
-        "role": user.role,
-        "name": user.full_name
-    }
-
-# --- Exam Routes (Protected) ---
-
-class ExamSessionCreate(BaseModel):
-    student_name: str
-    exam_type: str
-    question_paper_id: str | None = None
-
-@router.post("/sessions", response_model=ExamSession)
-def create_session(session_data: ExamSessionCreate, session: Session = Depends(get_session)):
-    new_session = ExamSession(
-        id=str(uuid.uuid4()),
-        student_name=session_data.student_name,
-        exam_type=session_data.exam_type,
-        status="Active",
-        trust_score=100,
-        started_at=datetime.now(),
-        alerts=[],
-        question_paper_id=session_data.question_paper_id
-    )
-    session.add(new_session)
-    session.commit()
-    session.refresh(new_session)
-    return new_session
-
-@router.get("/sessions", response_model=List[ExamSession])
-def get_sessions(student_name: str = None, session: Session = Depends(get_session)):
-    query = select(ExamSession)
-    if student_name:
-        query = query.where(ExamSession.student_name == student_name)
-    return session.exec(query).all()
-
-@router.get("/students", response_model=List[User])
-def get_students(session: Session = Depends(get_session)):
-    return session.exec(select(User).where(User.role == "student")).all()
-
-@router.get("/sessions/{session_id}", response_model=ExamSession)
-def get_session_by_id(session_id: str, session: Session = Depends(get_session)):
-    exam = session.get(ExamSession, session_id)
-    if not exam:
-         raise HTTPException(status_code=404, detail="Session not found")
-    return exam
-
-# --- Admin Routes ---
-
-
-# --- Pydantic Models for Creation ---
-
-class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str
-
-@router.post("/auth/change-password")
-def change_password(
-    password_data: PasswordChange,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    if not verify_password(password_data.current_password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Incorrect current password")
-    
-    current_user.password_hash = get_password_hash(password_data.new_password)
-    session.add(current_user)
-    session.commit()
-    return {"message": "Password updated successfully"}
-
-
-# --- Admin Student Management ---
-
-class StudentUpdate(BaseModel):
-    full_name: str | None = None
-    email: str | None = None
-    role: str | None = None
-    institution: str | None = None
-    password: str | None = None
-
-@router.post("/admin/students", response_model=User)
-def create_student(user: UserCreate, session: Session = Depends(get_session)):
-    # Reusing UserCreate model but secured for Admin
-    statement = select(User).where(User.email == user.email)
-    existing_user = session.exec(statement).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    new_user = User(
-        email=user.email,
-        password_hash=hashed_password,
-        full_name=user.full_name,
-        role=user.role,
-        institution=user.institution
-    )
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
-    return new_user
-
-@router.get("/admin/students", response_model=List[User])
-def get_all_students(session: Session = Depends(get_session)):
-    return session.exec(select(User).where(User.role == "student")).all()
-
-@router.delete("/admin/students/{user_id}")
-def delete_student(user_id: int, session: Session = Depends(get_session)):
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    session.delete(user)
-    session.commit()
-    return {"message": "User deleted"}
-
-@router.put("/admin/students/{user_id}", response_model=User)
-def update_student(user_id: int, student_data: StudentUpdate, session: Session = Depends(get_session)):
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if student_data.full_name:
-        user.full_name = student_data.full_name
-    if student_data.email:
-        user.email = student_data.email
-    if student_data.institution:
-        user.institution = student_data.institution
-    if student_data.role:
-        user.role = student_data.role
-    if student_data.password:
-        user.password_hash = get_password_hash(student_data.password)
-        
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
-
-
-class QuestionCreate(BaseModel):
-    text: str
-    options: List[str]
-    correct_answer: int
-
-class QuestionPaperCreate(BaseModel):
-    title: str
-    subject: str
-    questions: List[QuestionCreate]
-
-class QuestionPaperRead(BaseModel):
-    id: str
-    title: str
-    subject: str
-    questions: List[Question] # Requires Question model (circular ref might be issue if not careful, but Question uses string for 'paper' or ignored)
-    
-class AssignExamRequest(BaseModel):
-    student_name: str
-    exam_type: str
-    question_paper_id: str
-
-
-@router.post("/question-papers", response_model=QuestionPaper)
-def create_question_paper(
-    paper_data: QuestionPaperCreate, 
-    session: Session = Depends(get_session),
-    # current_user: User = Depends(get_current_admin) # Uncomment to enforce admin
-):
-    # 1. Create QuestionPaper
-    new_paper_id = str(uuid.uuid4())
-    new_paper = QuestionPaper(
-        id=new_paper_id,
-        title=paper_data.title,
-        subject=paper_data.subject
-        # created_by could be set here if we had current_user
-    )
-    session.add(new_paper)
-    
-    # 2. Create Questions linked to this paper
-    for q_data in paper_data.questions:
-        new_question = Question(
-            id=str(uuid.uuid4()),
-            text=q_data.text,
-            options=q_data.options,
-            correct_answer=q_data.correct_answer,
-            question_paper_id=new_paper_id
-        )
-        session.add(new_question)
-
-    session.commit()
-    session.refresh(new_paper)
-    return new_paper
-
-
-@router.post("/ocr/upload")
-async def upload_question_paper(file: UploadFile = File(...)):
-    if not file:
-        raise HTTPException(status_code=400, detail="No file uploaded")
-    
-    try:
-        content = await file.read()
-        # Basic check for image vs pdf (pdf support needs pypdf or pdf2image, here simple check)
-        # For now, support images
-        text = await extract_text_from_image(content, filename=file.filename)
-        if not text:
-            return {"questions": []}
-            
-        questions_data = parse_questions_from_text(text)
-        return {"questions": questions_data, "raw_text": text}
-    except Exception as e:
-        print(f"Upload error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process file")
-
-@router.get("/question-papers/{paper_id}", response_model=QuestionPaperRead)
-def get_question_paper(paper_id: str, session: Session = Depends(get_session)):
-    from sqlalchemy.orm import selectinload
-    paper = session.exec(select(QuestionPaper).where(QuestionPaper.id == paper_id).options(selectinload(QuestionPaper.questions))).first()
-    if not paper:
-        raise HTTPException(status_code=404, detail="Question paper not found")
-    return paper
-
-@router.get("/question-papers", response_model=List[QuestionPaper])
-def get_question_papers(session: Session = Depends(get_session)):
-    from sqlalchemy.orm import selectinload
-    return session.exec(select(QuestionPaper).options(selectinload(QuestionPaper.questions))).all()
-
-@router.post("/admin/assign-exam")
-def assign_exam(
-    request: AssignExamRequest,
-    session: Session = Depends(get_session)
-):
-    student_name = request.student_name
-    exam_type = request.exam_type
-    question_paper_id = request.question_paper_id
-
-    session_id = str(uuid.uuid4())
-    new_session = ExamSession(
-        id=session_id,
-        student_name=student_name,
-        exam_type=exam_type,
-        status="Active",
-        trust_score=100,
-        started_at=datetime.now(),
-        alerts=[],
-        question_paper_id=question_paper_id
-    )
-    session.add(new_session)
-    session.commit()
-    return {"session_id": session_id, "message": f"Exam assigned to {student_name}"}
-
-@router.get("/dashboard-stats")
-def get_dashboard_stats(session: Session = Depends(get_session)):
-    exam_statement = select(ExamSession)
-    exams = session.exec(exam_statement).all()
-    
-    active = [s for s in exams if s.status == "Active"]
-    flagged = [s for s in exams if s.status == "Flagged"]
-    avg_score = sum(s.trust_score for s in exams) / len(exams) if exams else 0
-    
-    # Count students (role='student')
-    student_statement = select(User).where(User.role == 'student')
-    student_count = len(session.exec(student_statement).all())
-    
-    return {
-        "active_exams": len(active),
-        "flagged_exams": len(flagged),
-        "total_exams_today": len(exams), # Total exams in DB
-        "average_trust_score": int(avg_score),
-        "total_students": student_count
-    }
-
-# --- Monitor Routes ---
-# Keeping the monitor logic similar but updating session via DB
-
 import cv2
 import numpy as np
 import base64
+from backend.app.ai_service import extract_exam_and_insights
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+router = APIRouter()
+
+# --- OCR Routes ---
+@router.post("/ocr/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        
+        # Use Gemini AI for extraction
+        result = extract_exam_and_insights(contents, file.content_type)
+        
+        if "error" in result:
+             return {"status": "error", "message": result["error"]}
+             
+        # Normalize response to match frontend expectation
+        # Frontend expects: { "text": "...", "questions": [...] }
+        # Gemini returns: { "questions": [...], "insights": "..." }
+        
+        # We can construct a "text" representation or just return what we have
+        # The frontend likely uses 'questions' array directly if available.
+        
+        return {
+            "status": "success", 
+            "filename": file.filename, 
+            "text": "Extracted via Tesseract", # Placeholder as we have structured data
+            "questions": result.get("questions", []),
+            "insights": result.get("insights", "")
+        }
+
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return {"status": "error", "message": str(e)}
+
+# --- Monitor Routes ---
+# Ensure haarcascade is available. If not, this might fail on startup, but standard cv2 usually has it.
+try:
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+except Exception:
+    face_cascade = None
+    print("Warning: Haarcascade not found")
 
 class FrameData(BaseModel):
     session_id: str
     image: str
 
 @router.post("/analyze_frame")
-def analyze_frame(data: FrameData, session: Session = Depends(get_session)):
-    try:
-        # Fetch session
-        exam = session.get(ExamSession, data.session_id)
-        if not exam:
-             return {"status": "Error", "message": "Session not found"} 
+def analyze_frame(data: FrameData):
+    if face_cascade is None:
+        return {"status": "Error", "message": "Face detection unavailble"}
         
+    try:
         # Decode image
         if "," in data.image:
             encoded_data = data.image.split(',')[1]
@@ -389,90 +80,13 @@ def analyze_frame(data: FrameData, session: Session = Depends(get_session)):
             is_suspicious = True
             reason = f"Multiple faces detected ({face_count})"
 
-        if is_suspicious:
-            # Update DB using SQLModel
-            exam.status = "Flagged" # Use Flagged instead of Terminated for soft warnings? Or Terminated.
-            if len(exam.alerts) is None: exam.alerts = []
-            
-            # Append new alert
-            current_alerts = list(exam.alerts)
-            current_alerts.append(f"Suspicion: {reason}")
-            exam.alerts = current_alerts
-            
-            exam.trust_score = max(0, exam.trust_score - 10)
-            session.add(exam)
-            session.commit()
-            
-            if exam.trust_score < 50:
-                 exam.status = "Terminated"
-                 session.add(exam)
-                 session.commit()
-                 return {"status": "Terminated", "reason": reason, "face_count": face_count}
-
-        return {"status": "Active", "face_count": face_count}
-
-        return {"status": "Active", "face_count": face_count}
+        # Return analysis result without DB update
+        return {
+            "status": "Flagged" if is_suspicious else "Active", 
+            "face_count": face_count,
+            "reason": reason if is_suspicious else None
+        }
 
     except Exception as e:
         print(f"Error analyzing frame: {e}")
         return {"status": "Error", "message": str(e)}
-
-
-# --- Submission Routes ---
-
-class ExamSubmission(BaseModel):
-    answers: dict[str, int] # Question ID -> Selected Option Index (or string if value)
-
-@router.post("/sessions/{session_id}/submit")
-def submit_exam(
-    session_id: str, 
-    submission: ExamSubmission, 
-    session: Session = Depends(get_session)
-):
-    exam_session = session.get(ExamSession, session_id)
-    if not exam_session:
-        raise HTTPException(status_code=404, detail="Session not found")
-        
-    if not exam_session.question_paper_id:
-         # If no paper assigned, maybe just mark complete?
-         exam_session.status = "Completed"
-         session.add(exam_session)
-         session.commit()
-         return {"message": "Session completed", "score": 0, "total": 0}
-
-    # Fetch Paper and Questions
-    paper = session.get(QuestionPaper, exam_session.question_paper_id)
-    # We need to load questions. 
-    # Since we are inside the function, we can do a fresh select or rely on lazy loading if enabled, 
-    # but strictly it's better to eager load or query directly.
-    questions = session.exec(select(Question).where(Question.question_paper_id == exam_session.question_paper_id)).all()
-    
-    score = 0
-    total = len(questions)
-    
-    for q in questions:
-        # Check if question was answered
-        if q.id in submission.answers:
-            # simple comparison: correct_answer is int index
-            if submission.answers[q.id] == q.correct_answer:
-                score += 1
-    
-    # Calculate percentage or keep raw? Let's keep raw count or percentage. 
-    # User asked for "marks". Let's give percentage * 100 or just raw score.
-    # Let's save percentage in score field (0-100)
-    
-    final_score = (score / total * 100) if total > 0 else 0
-    
-    exam_session.score = round(final_score, 2)
-    exam_session.status = "Completed"
-    
-    session.add(exam_session)
-    session.commit()
-    
-    return {
-        "score": score, 
-        "total": total, 
-        "percentage": exam_session.score,
-        "message": "Exam submitted successfully"
-    }
-

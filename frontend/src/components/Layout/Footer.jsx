@@ -62,8 +62,6 @@ export const Footer = () => {
                         gap: '0.75rem'
                     }}>
                         <li><Link to="/about" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>About Us</Link></li>
-                        <li><Link to="/student" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>Student Portal</Link></li>
-                        <li><Link to="/admin" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>Admin Dashboard</Link></li>
                         <li><Link to="/docs" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>API Documentation</Link></li>
                     </ul>
                 </div>

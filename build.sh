@@ -1,24 +1,20 @@
 #!/bin/bash
-
 # Exit on error
 set -e
 
-echo "Deploying..."
+echo "Build Script Started..."
 
-# Install Python Dependencies
+# 1. Install Backend Dependencies
 echo "Installing Python dependencies..."
 pip install -r backend/requirements.txt
 
-# Install Node Dependencies
+# 2. Install Frontend Dependencies
 echo "Installing Node dependencies..."
 cd frontend
 npm install
 
-# Build Frontend
+# 3. Build Frontend
 echo "Building Frontend..."
 npm run build
 
-# Go back to root
-cd ..
-
-echo "Build successful!"
+echo "Build Complete!"

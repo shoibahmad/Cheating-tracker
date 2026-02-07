@@ -1,34 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { X, User, LogOut, Settings, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 export const ProfileDrawer = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
+    const { currentUser, userRole, logout } = useAuth();
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-    const [user, setUser] = useState({ name: '', role: '', email: '' });
 
-    useEffect(() => {
-        // Fetch details from local storage or wherever it's stored
-        // In a real app maybe decoding the JWT token again
-        const name = localStorage.getItem('user_name') || 'Guest User';
-        const role = localStorage.getItem('role') || 'Visitor';
-        // Mock email if not stored, or maybe we stored it? We only stored token/role/name in LoginPage
-        // Let's assume we might have stored it or just show a placeholder/derive it
-        const email = localStorage.getItem('user_email') || 'user@secureeval.com';
-
-        setUser({ name, role, email });
-    }, [isOpen]);
+    // Derived state from context
+    const name = currentUser?.displayName || 'User';
+    const email = currentUser?.email || '';
+    const role = userRole || 'Student';
 
     const handleLogout = () => {
         setShowLogoutConfirm(true);
     };
 
-    const confirmLogout = () => {
-        localStorage.clear();
-        navigate('/login');
-        onClose();
-        setShowLogoutConfirm(false);
+    const confirmLogout = async () => {
+        try {
+            await logout();
+            navigate('/login');
+            onClose();
+        } catch (error) {
+            console.error("Logout failed", error);
+        } finally {
+            setShowLogoutConfirm(false);
+        }
     };
 
     return (
@@ -126,18 +125,18 @@ export const ProfileDrawer = ({ isOpen, onClose }) => {
                         boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)'
                     }}>
                         <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'white' }}>
-                            {user.name.charAt(0).toUpperCase()}
+                            {name.charAt(0).toUpperCase()}
                         </span>
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>{user.name}</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{user.email}</p>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>{name}</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{email}</p>
                     <div style={{
                         display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: '20px',
-                        background: user.role === 'admin' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
-                        color: user.role === 'admin' ? 'var(--accent-success)' : 'var(--accent-primary)',
+                        background: role === 'admin' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                        color: role === 'admin' ? 'var(--accent-success)' : 'var(--accent-primary)',
                         fontSize: '0.8rem', fontWeight: 600, marginTop: '0.5rem'
                     }}>
-                        {user.role.toUpperCase()}
+                        {role.toUpperCase()}
                     </div>
                 </div>
 

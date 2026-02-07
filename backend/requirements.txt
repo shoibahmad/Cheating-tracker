@@ -11,3 +11,5 @@ pytesseract
 Pillow
 python-multipart
 pdf2image
+google-generativeai
+python-dotenv
