@@ -216,7 +216,7 @@ export const AdminDashboard = () => {
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Status</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Action</th>
+
                                 </tr>
                             </thead>
                             <tbody>
@@ -264,9 +264,7 @@ export const AdminDashboard = () => {
                                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{session.trust_score}%</span>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '1rem' }}>
-                                            <Link to={`/monitor/${session.id}`} className="btn-text" style={{ fontSize: '0.85rem', color: 'var(--accent-primary)' }}>Monitor</Link>
-                                        </td>
+
                                     </tr>
                                 ))}
                             </tbody>

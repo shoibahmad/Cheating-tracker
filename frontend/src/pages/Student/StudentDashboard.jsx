@@ -57,7 +57,7 @@ export const StudentDashboard = () => {
     }, [currentUser]);
 
     return (
-        <div className="container" style={{ maxWidth: '1000px' }}>
+        <div className="container" style={{ maxWidth: '1000px', paddingBottom: '4rem' }}>
             <div style={{ marginBottom: '2rem' }}>
                 <h2>Student Portal</h2>
                 <p>Welcome back, <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{studentName}</span></p>

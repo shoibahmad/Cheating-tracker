@@ -22,7 +22,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
         { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/admin/create-paper', label: 'Create Paper', icon: FileText }, // Updated to new page
         { path: '/admin/assign-exam', label: 'Assign Exam', icon: School }, // Added for easy access
-        { path: '/monitor', label: 'Live Monitoring', icon: Eye },
+
         // { path: '/student', label: 'Student Portal', icon: GraduationCap }, // Removed per request
         { path: '/institutions', label: 'Institutions', icon: Building2 },
         { path: '/corporate', label: 'Corporate', icon: Building2 },
