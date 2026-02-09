@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-dotenv
+python-multipart
+pydantic
+opencv-python-headless
+numpy
+pillow
+pytesseract
+pdf2image
+pypdf
+google-generativeai
+requests

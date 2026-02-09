@@ -1,43 +1,36 @@
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# Install system dependencies (Tesseract, OpenCV deps, Node.js)
+# Install system dependencies for OpenCV and Tesseract
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    libgl1 \
-    libglib2.0-0 \
+    libtesseract-dev \
     poppler-utils \
-    curl \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Set work directory
+# Set the working directory
 WORKDIR /app
 
-# --- Frontend Build ---
-COPY frontend/package*.json ./frontend/
+# Copy the current directory contents into the container at /app
+COPY . .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Build the frontend
 WORKDIR /app/frontend
 RUN npm install
-COPY frontend/ ./
 RUN npm run build
+
+# Switch back to app root
 WORKDIR /app
 
-# --- Backend Setup ---
-COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Copy backend code
-COPY backend/ ./backend/
-COPY .env .env
-
-# Expose port (Render sets PORT env)
+# Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run the application
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

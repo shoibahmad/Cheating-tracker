@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: "eval-448ac.firebaseapp.com",
-    projectId: "eval-448ac",
-    storageBucket: "eval-448ac.firebasestorage.app",
-    messagingSenderId: "998333220881",
-    appId: "1:998333220881:web:d35811d2d155c3420749b0",
-    measurementId: "G-WG216KKBS4"
+    authDomain: "eval-6be19.firebaseapp.com",
+    projectId: "eval-6be19",
+    storageBucket: "eval-6be19.firebasestorage.app",
+    messagingSenderId: "103669883499",
+    appId: "1:103669883499:web:9352f790699d862c5f072e",
+    measurementId: "G-8ZWSRX3KVQ"
 };
 
 const app = initializeApp(firebaseConfig);
