@@ -5,6 +5,7 @@ import { Header } from './components/Layout/Header';
 import { Footer } from './components/Layout/Footer';
 // import { ProtectedRoute } from './components/ProtectedRoute'; // Replaced/Inline below
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/Common/ErrorBoundary';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -40,6 +41,8 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
 
+  console.log("ProtectedRoute:", { path: location.pathname, hasUser: !!currentUser, role: userRole });
+
   if (!currentUser) {
     // Redirect to login, but save the location they were trying to go to
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -47,6 +50,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   // If user has no role yet (e.g. fresh Google signup), they must go to signup to select role
   if (!userRole) {
+    console.log("User has no role, redirecting to signup");
     return <Navigate to="/signup" replace />;
   }
 
@@ -65,6 +69,8 @@ const PublicRouteGuard = ({ children }) => {
   const { currentUser, userRole, loading } = useAuth();
 
   if (loading) return <div>Loading...</div>;
+
+  console.log("PublicRouteGuard:", { currentUser: !!currentUser, userRole });
 
   // If logged in AND has a role, redirect to dashboard.
   // If no role (new user), allow access to public pages (specifically Signup to finish setup)
@@ -137,56 +143,58 @@ function App() {
     <AuthProvider>
       <Router>
         <Toaster position="top-right" reverseOrder={false} />
-        <Routes>
-          {/* Public Routes (Redirect to Dashboard if logged in) */}
-          <Route element={<PublicRouteGuard><PublicLayout /></PublicRouteGuard>}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/docs" element={<ApiDocsPage />} />
-            <Route path="/get-started" element={<GetStartedPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            {/* Student Login alias if needed */}
-            <Route path="/student/login" element={<StudentLogin />} />
-          </Route>
-
-          {/* Protected Dashboard Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['admin', 'student']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              {/* Shared routes? */}
+        <ErrorBoundary>
+          <Routes>
+            {/* Public Routes (Redirect to Dashboard if logged in) */}
+            <Route element={<PublicRouteGuard><PublicLayout /></PublicRouteGuard>}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/docs" element={<ApiDocsPage />} />
+              <Route path="/get-started" element={<GetStartedPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              {/* Student Login alias if needed */}
+              <Route path="/student/login" element={<StudentLogin />} />
             </Route>
-          </Route>
 
-          {/* Admin Only Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/create-paper" element={<CreatePaperPage />} />
-              <Route path="/admin/assign-exam" element={<AssignExamPage />} />
-              <Route path="/admin/students" element={<StudentManagementPage />} />
-              <Route path="/schedule" element={<ScheduleExamPage />} />
-              <Route path="/monitor" element={<MonitorSelectionPage />} />
-              <Route path="/monitor/:id" element={<MonitorPage />} />
-              <Route path="/institutions" element={<InstitutionsPage />} />
-              <Route path="/exams" element={<ExamsPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
+            {/* Protected Dashboard Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'student']} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                {/* Shared routes? */}
+              </Route>
             </Route>
-          </Route>
 
-          {/* Student Only Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['student']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/student" element={<StudentDashboard />} />
-              <Route path="/student/dashboard" element={<StudentDashboard />} />
-              <Route path="/student/exam/:id" element={<StudentExamPage />} />
+            {/* Admin Only Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/create-paper" element={<CreatePaperPage />} />
+                <Route path="/admin/assign-exam" element={<AssignExamPage />} />
+                <Route path="/admin/students" element={<StudentManagementPage />} />
+                <Route path="/schedule" element={<ScheduleExamPage />} />
+                <Route path="/monitor" element={<MonitorSelectionPage />} />
+                <Route path="/monitor/:id" element={<MonitorPage />} />
+                <Route path="/institutions" element={<InstitutionsPage />} />
+                <Route path="/exams" element={<ExamsPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+              </Route>
             </Route>
-          </Route>
 
-        </Routes>
+            {/* Student Only Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['student']} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/student" element={<StudentDashboard />} />
+                <Route path="/student/dashboard" element={<StudentDashboard />} />
+                <Route path="/student/exam/:id" element={<StudentExamPage />} />
+              </Route>
+            </Route>
+
+          </Routes>
+        </ErrorBoundary>
       </Router>
     </AuthProvider>
   );

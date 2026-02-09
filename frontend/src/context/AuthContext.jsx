@@ -18,7 +18,10 @@ export const AuthProvider = ({ children }) => {
             const docRef = doc(db, "users", user.uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                setUserRole(docSnap.data().role);
+                let role = docSnap.data().role;
+                // Fix for legacy/bad data
+                if (role === 'isAdmin') role = 'admin';
+                setUserRole(role);
             } else {
                 setUserRole(null);
             }
@@ -57,7 +60,21 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {loading ? (
+                <div style={{
+                    height: '100vh',
+                    width: '100vw',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#0f172a',
+                    color: 'white'
+                }}>
+                    <div style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Initializing SecureEval...</div>
+                    <div style={{ opacity: 0.7 }}>Checking authentication status</div>
+                </div>
+            ) : children}
         </AuthContext.Provider>
     );
 };

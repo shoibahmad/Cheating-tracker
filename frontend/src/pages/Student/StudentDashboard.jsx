@@ -32,15 +32,14 @@ export const StudentDashboard = () => {
     };
 
 
-    const [assignedExams, setAssignedExams] = useState([]);
+    const [error, setError] = useState(null);
 
     // Auto-fetch assigned exams
     useEffect(() => {
         const fetchAssigned = async () => {
             if (currentUser?.uid) {
                 try {
-                    // Assuming 'sessions' collection has a 'studentId' or 'student_name' field
-                    // Better to query by ID
+                    setError(null);
                     const q = query(collection(db, "sessions"), where("studentId", "==", currentUser.uid));
                     const querySnapshot = await getDocs(q);
                     const sessions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -50,11 +49,24 @@ export const StudentDashboard = () => {
                     setAssignedExams(active);
                 } catch (err) {
                     console.error("Error fetching assigned exams:", err);
+                    setError(err.message);
                 }
             }
         };
         fetchAssigned();
     }, [currentUser]);
+
+    if (error) {
+        return (
+            <div className="container" style={{ padding: '2rem', textAlign: 'center' }}>
+                <div style={{ color: 'red', marginBottom: '1rem' }}>
+                    <h3>Error Loading Dashboard</h3>
+                    <p>{error}</p>
+                </div>
+                <p>Please check your internet connection or API Key configuration.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="container" style={{ maxWidth: '1000px', paddingBottom: '4rem' }}>

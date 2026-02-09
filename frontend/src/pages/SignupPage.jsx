@@ -4,6 +4,7 @@ import { User, Mail, Lock, ArrowRight, Building, GraduationCap, Shield } from 'l
 import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, deleteUser } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 export const SignupPage = () => {

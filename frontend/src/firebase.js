@@ -8,8 +8,8 @@ const firebaseConfig = {
     projectId: "eval-448ac",
     storageBucket: "eval-448ac.firebasestorage.app",
     messagingSenderId: "998333220881",
-    appId: "1:998333220881:web:4d5522381e5b2f730749b0",
-    measurementId: "G-05Z74GNPV4"
+    appId: "1:998333220881:web:d35811d2d155c3420749b0",
+    measurementId: "G-WG216KKBS4"
 };
 
 const app = initializeApp(firebaseConfig);

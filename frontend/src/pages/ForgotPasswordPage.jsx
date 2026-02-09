@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from '../firebase';
+import toast from 'react-hot-toast';
 
 export const ForgotPasswordPage = () => {
     const navigate = useNavigate();
@@ -8,14 +11,20 @@ export const ForgotPasswordPage = () => {
     const [sent, setSent] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+
+        try {
+            await sendPasswordResetEmail(auth, email);
             setSent(true);
+            toast.success("Password reset email sent!");
+        } catch (error) {
+            console.error("Error sending password reset email:", error);
+            toast.error(error.message);
+        } finally {
             setLoading(false);
-        }, 1500);
+        }
     };
 
     return (

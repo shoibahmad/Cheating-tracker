@@ -81,7 +81,24 @@ export const LoginPage = () => {
                     navigate('/student/dashboard');
                 }
             } else {
-                toast.error("User data not found in database.");
+                // Determine name (fallback)
+                const name = user.displayName || user.email.split('@')[0];
+
+                // If user doesn't exist in Firestore (e.g. manual deletion or sync issue), recreate them
+                await setDoc(doc(db, "users", user.uid), {
+                    email: user.email,
+                    full_name: name,
+                    role: 'student', // Default fallback role
+                    institution: '',
+                    createdAt: new Date().toISOString()
+                });
+
+                localStorage.setItem('token', await user.getIdToken());
+                localStorage.setItem('role', 'student');
+                localStorage.setItem('user_name', name);
+
+                toast.success('Profile created & Logged in!');
+                navigate('/student/dashboard');
             }
 
         } catch (err) {

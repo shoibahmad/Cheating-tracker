@@ -7,7 +7,6 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.routers import router as api_router
-import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -37,17 +36,6 @@ app.include_router(api_router, prefix="/api")
 # Serve React static assets (JS, CSS, Images)
 # Mount "assets" from the build folder
 app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
-
-# Catch-all route to serve index.html for SPA (React Router)
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    # Check if the path is a file (e.g. favicon.ico, manifest.json) in root of dist
-    file_path = f"frontend/dist/{full_path}"
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
-        
-    # Otherwise, return index.html for client-side routing
-    return FileResponse("frontend/dist/index.html")
 
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
