@@ -1,3 +1,5 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from '../../firebase'; // Adjust path if needed
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +8,7 @@ export const StudentDashboard = () => {
     const navigate = useNavigate();
     const [sessionId, setSessionId] = useState('');
     const [papers, setPapers] = useState([]);
+    const [assignedExams, setAssignedExams] = useState([]);
     const { currentUser } = useAuth();
     const studentName = currentUser?.displayName || 'Student';
 

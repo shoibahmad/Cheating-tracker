@@ -4,17 +4,44 @@ import os
 # Load environment variables from the same directory as main.py
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.routers import router as api_router
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import time
+import logging
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="SecureEval Tracking System API",
-    description="Backend for the SecureEval platform",
-    version="1.0.0"
+    description="Backend for the SecureEval platform. Provides OCR, Face Detection, and Monitoring services.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
+
+# Middleware for Logging Requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    
+    # Log details
+    logger.info(
+        f"Method: {request.method} | Path: {request.url.path} | "
+        f"Status: {response.status_code} | Duration: {process_time:.4f}s"
+    )
+    
+    return response
 
 # CORS config
 origins = [

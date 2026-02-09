@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet, Navigate } from 'react-router-dom';
-import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Footer } from './components/Layout/Footer';
 // import { ProtectedRoute } from './components/ProtectedRoute'; // Replaced/Inline below
@@ -18,7 +17,7 @@ import { MonitorPage } from './pages/MonitorPage';
 import { MonitorSelectionPage } from './pages/MonitorSelectionPage';
 import { ScheduleExamPage } from './pages/ScheduleExamPage';
 import { AboutPage } from './pages/AboutPage';
-import { ApiDocsPage } from './pages/ApiDocsPage';
+import { APIDocsPage } from './pages/ApiDocsPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { InstitutionsPage } from './pages/InstitutionsPage';
 import { ExamsPage } from './pages/ExamsPage';
@@ -84,30 +83,16 @@ const PublicRouteGuard = ({ children }) => {
 
 // Layouts
 const DashboardLayout = () => {
-  const location = useLocation();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  const getTitle = () => {
-    if (location.pathname.startsWith('/dashboard')) return 'Overview';
-    if (location.pathname.startsWith('/monitor')) return 'Live Monitoring';
-    if (location.pathname.startsWith('/institutions')) return 'Institutions';
-    if (location.pathname.startsWith('/settings')) return 'Settings';
-    return location.pathname === '/' ? 'Home' : 'SecureEval';
-  };
-
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)', flexDirection: 'column' }}>
       {/* Background Ambient Glow */}
       <div className="shape shape-1" />
       <div className="shape shape-2" />
 
-      {/* Conditionally render Sidebar only for dashboard routes if desired, or always */}
-      {!location.pathname.startsWith('/student') && !['/', '/login', '/signup', '/about'].includes(location.pathname) && (
-        <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
-      )}
+      {/* Header handles navigation now */}
+      <Header />
 
       <div className="main-content" style={{ flex: 1, overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Header title={getTitle()} onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
         <div style={{ paddingBottom: '2rem', flex: 1 }}>
           <Outlet />
         </div>
@@ -149,7 +134,7 @@ function App() {
             <Route element={<PublicRouteGuard><PublicLayout /></PublicRouteGuard>}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/docs" element={<ApiDocsPage />} />
+              <Route path="/docs" element={<APIDocsPage />} />
               <Route path="/get-started" element={<GetStartedPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />

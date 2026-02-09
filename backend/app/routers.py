@@ -8,7 +8,7 @@ from backend.app.ai_service import extract_exam_and_insights
 router = APIRouter()
 
 # --- OCR Routes ---
-@router.post("/ocr/upload")
+@router.post("/ocr/upload", tags=["OCR Service"], summary="Upload Exam Paper", description="Uploads an image or PDF exam paper, extracts text via OCR/AI, and returns structured questions.")
 async def upload_file(file: UploadFile = File(...)):
     try:
         contents = await file.read()
@@ -50,7 +50,7 @@ class FrameData(BaseModel):
     session_id: str
     image: str
 
-@router.post("/analyze_frame")
+@router.post("/analyze_frame", tags=["Monitoring Service"], summary="Analyze Webcam Frame", description="Analyzes a single webcam frame for face detection to identify potential cheating (no face, multiple faces).")
 def analyze_frame(data: FrameData):
     if face_cascade is None:
         return {"status": "Error", "message": "Face detection unavailble"}
