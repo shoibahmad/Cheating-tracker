@@ -27,14 +27,21 @@ export const StudentManagementPage = () => {
 
     const fetchStudents = async () => {
         try {
+            console.log("Fetching from:", `${API_BASE_URL}/api/admin/students`);
             const res = await fetch(`${API_BASE_URL}/api/admin/students`);
+            console.log("Response status:", res.status);
             if (res.ok) {
                 const data = await res.json();
+                console.log("Fetched Students:", data);
                 setStudents(data);
+            } else {
+                const text = await res.text();
+                console.error("Fetch failed:", text);
+                toast.error("Failed to fetch: " + res.status);
             }
         } catch (err) {
-            console.error(err);
-            toast.error("Failed to load students");
+            console.error("Fetch Error:", err);
+            toast.error("Failed to load students: " + err.message);
         } finally {
             setLoading(false);
         }

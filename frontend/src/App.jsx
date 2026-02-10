@@ -26,6 +26,8 @@ import { SettingsPage } from './pages/SettingsPage';
 import { StudentLogin } from './pages/Student/StudentLogin';
 import { StudentExamPage } from './pages/Student/StudentExamPage';
 import { StudentDashboard } from './pages/Student/StudentDashboard';
+import { StudentExamsPage } from './pages/Student/StudentExamsPage';
+import { StudentReportsPage } from './pages/Student/StudentReportsPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { CreatePaperPage } from './pages/Admin/CreatePaperPage';
 import { AssignExamPage } from './pages/Admin/AssignExamPage';
@@ -174,6 +176,8 @@ function App() {
               <Route element={<DashboardLayout />}>
                 <Route path="/student" element={<StudentDashboard />} />
                 <Route path="/student/dashboard" element={<StudentDashboard />} />
+                <Route path="/student/exams" element={<StudentExamsPage />} />
+                <Route path="/student/reports" element={<StudentReportsPage />} />
                 <Route path="/student/exam/:id" element={<StudentExamPage />} />
               </Route>
             </Route>

@@ -7,11 +7,8 @@ import { useState } from 'react';
 export const InstitutionsPage = () => {
     const [showSchedule, setShowSchedule] = useState(false);
     const institutions = [
-        { id: 1, name: "Stanford University", location: "California, USA", active_exams: 12, students: 4500 },
-        { id: 2, name: "MIT", location: "Massachusetts, USA", active_exams: 8, students: 3200 },
-        { id: 3, name: "Harvard University", location: "Massachusetts, USA", active_exams: 15, students: 5100 },
-        { id: 4, name: "Oxford University", location: "Oxford, UK", active_exams: 10, students: 4300 },
-        { id: 5, name: "Cambridge University", location: "Cambridge, UK", active_exams: 14, students: 4800 },
+        { id: 1, name: "Integral University", location: "Lucknow, India", active_exams: 12, students: 4500 },
+        { id: 2, name: "Jamia Hamdard University", location: "New Delhi, India", active_exams: 8, students: 3200 },
     ];
 
     return (

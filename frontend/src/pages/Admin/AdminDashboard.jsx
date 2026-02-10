@@ -216,6 +216,7 @@ export const AdminDashboard = () => {
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Status</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
+                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Latest Alert</th>
 
                                 </tr>
                             </thead>
@@ -226,9 +227,9 @@ export const AdminDashboard = () => {
                                         <td style={{ padding: '1rem', fontWeight: 500 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                    {session.student_name.charAt(0)}
+                                                    {(session.student_name || session.studentName || '?').charAt(0)}
                                                 </div>
-                                                {session.student_name}
+                                                {session.student_name || session.studentName || 'Unknown'}
                                             </div>
                                         </td>
                                         <td style={{ padding: '1rem', opacity: 0.8 }}>{session.exam_type}</td>
@@ -255,14 +256,34 @@ export const AdminDashboard = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', width: '80px' }}>
                                                     <div style={{
-                                                        width: `${session.trust_score}%`,
+                                                        width: `${session.trust_score !== undefined ? session.trust_score : 100}%`,
                                                         height: '100%',
                                                         borderRadius: '3px',
-                                                        background: session.trust_score > 80 ? 'var(--accent-success)' : session.trust_score > 50 ? 'var(--accent-warning)' : 'var(--accent-alert)'
+                                                        background: (session.trust_score !== undefined ? session.trust_score : 100) > 80 ? 'var(--accent-success)' : (session.trust_score || 100) > 50 ? 'var(--accent-warning)' : 'var(--accent-alert)'
                                                     }} />
                                                 </div>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{session.trust_score}%</span>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{session.trust_score !== undefined ? session.trust_score : 100}%</span>
                                             </div>
+                                        </td>
+                                        <td style={{ padding: '1rem', maxWidth: '200px' }}>
+                                            {session.latest_log ? (
+                                                <div style={{
+                                                    fontSize: '0.85rem',
+                                                    color: 'var(--accent-alert)',
+                                                    background: 'rgba(244, 63, 94, 0.1)',
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '4px',
+                                                    display: 'inline-block',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    maxWidth: '100%'
+                                                }} title={session.latest_log}>
+                                                    ⚠ {session.latest_log}
+                                                </div>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
+                                            )}
                                         </td>
 
                                     </tr>

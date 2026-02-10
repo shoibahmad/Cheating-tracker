@@ -44,10 +44,12 @@ async def log_requests(request: Request, call_next):
     return response
 
 # CORS config
+# CORS config
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "*"
+    "http://127.0.0.1:5173",
+    "https://your-production-domain.com" # Placeholder
 ]
 
 app.add_middleware(

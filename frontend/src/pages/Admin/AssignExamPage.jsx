@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import {
     User,
@@ -12,53 +11,75 @@ import {
     CheckCircle,
     Cpu
 } from 'lucide-react';
+import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { db } from '../../firebase';
 
 export const AssignExamPage = () => {
     const navigate = useNavigate();
 
     const [papers, setPapers] = useState([]);
     const [selectedPaper, setSelectedPaper] = useState('');
-    const [studentName, setStudentName] = useState('');
+    const [selectedStudentId, setSelectedStudentId] = useState('');
     const [examType, setExamType] = useState('University');
     const [generatedSession, setGeneratedSession] = useState(null);
     const [loading, setLoading] = useState(false);
     const [students, setStudents] = useState([]);
 
     useEffect(() => {
-        // Fetch Question Papers
-        fetch(`${API_BASE_URL}/api/question-papers`)
-            .then(res => res.json())
-            .then(data => setPapers(data))
-            .catch(err => console.error(err));
+        const fetchData = async () => {
+            try {
+                // Fetch Question Papers
+                const papersSnapshot = await getDocs(collection(db, "exams"));
+                const papersList = papersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setPapers(papersList);
 
-        // Fetch Students
-        fetch(`${API_BASE_URL}/api/students`)
-            .then(res => res.json())
-            .then(data => setStudents(data))
-            .catch(err => console.error(err));
+                // Fetch Students from 'users' collection where role is 'student'
+                const studentsQuery = query(collection(db, "users"), where("role", "==", "student"));
+                const studentsSnapshot = await getDocs(studentsQuery);
+                const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setStudents(studentsList);
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                toast.error("Failed to load data");
+            }
+        };
+        fetchData();
     }, []);
 
     const handleAssign = async (e) => {
         e.preventDefault();
         setLoading(true);
+
+        if (!selectedStudentId || !selectedPaper) {
+            toast.error("Please select both a student and a paper");
+            setLoading(false);
+            return;
+        }
+
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/assign-exam`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    student_name: studentName,
-                    exam_type: examType,
-                    question_paper_id: selectedPaper
-                })
-            });
-            const data = await res.json();
-            setGeneratedSession(data);
-            toast.success("Session ID generated successfully!");
+            // Find selected student details
+            const student = students.find(s => s.id === selectedStudentId);
+            const paper = papers.find(p => p.id === selectedPaper);
+
+            const sessionData = {
+                studentId: selectedStudentId,
+                student_name: student?.full_name || 'Unknown', // snake_case for consistency
+                examId: selectedPaper,
+                examTitle: paper?.title || 'Untitled Exam',
+                exam_type: examType,
+                status: 'Active',
+                questions: paper?.questions || [],
+                trust_score: 100, // Initialize trust score
+                createdAt: serverTimestamp()
+            };
+
+            const docRef = await addDoc(collection(db, "sessions"), sessionData);
+
+            setGeneratedSession({ session_id: docRef.id });
+            toast.success("Exam assigned successfully!");
         } catch (err) {
             console.error(err);
-            toast.error('Failed to assign exam');
+            toast.error('Failed to assign exam: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -103,15 +124,15 @@ export const AssignExamPage = () => {
                         </label>
                         <div style={{ position: 'relative' }}>
                             <select
-                                value={studentName}
-                                onChange={(e) => setStudentName(e.target.value)}
+                                value={selectedStudentId}
+                                onChange={(e) => setSelectedStudentId(e.target.value)}
                                 className="glass-input"
                                 style={{ width: '100%', appearance: 'none', padding: '1rem', fontSize: '1rem', cursor: 'pointer' }}
                                 required
                             >
-                                <option value="" style={{ color: 'black' }}>-- Select Student --</option>
+                                <option value="">-- Select Student --</option>
                                 {students.map(s => (
-                                    <option key={s.id} value={s.full_name} style={{ color: 'black' }}>{s.full_name} ({s.email})</option>
+                                    <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>
                                 ))}
                             </select>
                             <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}>
@@ -131,9 +152,9 @@ export const AssignExamPage = () => {
                                 className="glass-input"
                                 style={{ width: '100%', appearance: 'none', padding: '1rem', fontSize: '1rem', cursor: 'pointer' }}
                             >
-                                <option value="University" style={{ color: 'black' }}>University Exam</option>
-                                <option value="Corporate" style={{ color: 'black' }}>Corporate Assessment</option>
-                                <option value="Competitive" style={{ color: 'black' }}>Competitive Exam</option>
+                                <option value="University">University Exam</option>
+                                <option value="Corporate">Corporate Assessment</option>
+                                <option value="Competitive">Competitive Exam</option>
                             </select>
                             <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}>
                                 ▼
@@ -153,9 +174,9 @@ export const AssignExamPage = () => {
                                 style={{ width: '100%', appearance: 'none', padding: '1rem', fontSize: '1rem', cursor: 'pointer' }}
                                 required
                             >
-                                <option value="" style={{ color: 'black' }}>-- Select Paper --</option>
+                                <option value="">-- Select Paper --</option>
                                 {papers.map(p => (
-                                    <option key={p.id} value={p.id} style={{ color: 'black' }}>{p.title} ({p.subject})</option>
+                                    <option key={p.id} value={p.id}>{p.title} ({p.subject})</option>
                                 ))}
                             </select>
                             <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}>

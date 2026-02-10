@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 pydantic
+firebase-admin
 python-multipart
 sqlmodel
 passlib

@@ -23,14 +23,25 @@ export const StudentExamPage = () => {
                 if (!sessionRes.ok) throw new Error("Session not found");
                 const sessionData = await sessionRes.json();
 
-                if (sessionData.question_paper_id) {
+                // Check for embedded questions first (preferred for snapshot consistency)
+                if (sessionData.questions && sessionData.questions.length > 0) {
+                    setQuestions(sessionData.questions);
+                }
+                // Fallback to fetching paper if examId exists
+                else if (sessionData.examId) {
                     // 2. Get Question Paper
-                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
+                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.examId}`);
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
                     } else {
                         console.error("Failed to load question paper");
+                    }
+                } else if (sessionData.question_paper_id) { // Legacy support
+                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
+                    if (paperRes.ok) {
+                        const paperData = await paperRes.json();
+                        setQuestions(paperData.questions || []);
                     }
                 }
             } catch (err) {
@@ -73,6 +84,8 @@ export const StudentExamPage = () => {
         };
     }, []);
 
+    const [noFaceDuration, setNoFaceDuration] = useState(0); // Seconds without face
+
     const captureAndAnalyze = async () => {
         if (!videoRef.current || terminated) return;
 
@@ -95,15 +108,48 @@ export const StudentExamPage = () => {
 
             if (res.ok) {
                 const data = await res.json();
+
                 if (data.status === 'Terminated') {
                     setTerminated(true);
                     setTerminationReason(data.reason);
-                } else if (data.status === 'Active' && data.face_count === 0) {
-                    // Could implement soft warning here before termination logic handles it
+                } else if (data.status === 'Flagged') {
+                    if (data.reason === 'No face detected') {
+                        setNoFaceDuration(prev => prev + 3); // Approx 3s per interval
+                    } else {
+                        // Reset timer if face returns or different flag
+                        // Actually, if 'Multiple faces', we might want immediate strict action too, 
+                        // but request specifically mentioned "not found" for 15s.
+                        if (data.reason !== 'No face detected') {
+                            setNoFaceDuration(0);
+                        }
+                    }
+                } else {
+                    // Face detected, Active status
+                    setNoFaceDuration(0);
                 }
             }
         } catch (e) {
             console.error("Monitor error", e);
+        }
+    };
+
+    // Effect to handle 15s violation
+    useEffect(() => {
+        if (noFaceDuration >= 15 && !terminated) {
+            handleTermination("User not found for 15 seconds");
+        }
+    }, [noFaceDuration, terminated]);
+
+    const handleTermination = async (reason) => {
+        try {
+            setTerminated(true);
+            setTerminationReason(reason);
+
+            await fetch(`${API_BASE_URL}/api/sessions/${id}/terminate?reason=${encodeURIComponent(reason)}`, {
+                method: 'POST'
+            });
+        } catch (err) {
+            console.error("Termination error", err);
         }
     };
 
@@ -240,6 +286,34 @@ export const StudentExamPage = () => {
                 }}>
                     <LoadingScreen />
                     {submitting && <p style={{ marginTop: '2rem', fontSize: '1.2rem', color: 'var(--accent-primary)', animation: 'pulse 2s infinite' }}>Submitting Exam... Please Wait</p>}
+                </div>
+            )}
+
+            {/* Red Alert Overlay - Show when face not found but not yet terminated */}
+            {noFaceDuration > 0 && !terminated && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: 9990,
+                    backgroundColor: 'rgba(220, 38, 38, 0.3)', // Red tint
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none', // Allow clicking through if needed, or strictly block
+                    border: '10px solid var(--accent-alert)'
+                }}>
+                    <div style={{
+                        backgroundColor: '#000',
+                        color: 'var(--accent-alert)',
+                        padding: '2rem',
+                        borderRadius: '12px',
+                        textAlign: 'center',
+                        border: '2px solid var(--accent-alert)',
+                        boxShadow: '0 0 50px rgba(220, 38, 38, 0.5)'
+                    }}>
+                        <AlertTriangle size={64} style={{ margin: '0 auto 1rem', animation: 'pulse 0.5s infinite' }} />
+                        <h2 style={{ fontSize: '2rem', fontWeight: 'bold' }}>RED ALERT</h2>
+                        <p style={{ fontSize: '1.2rem' }}>FACE NOT DETECTED!</p>
+                        <p style={{ marginTop: '1rem', color: '#fff' }}>Exam will terminate in: {15 - noFaceDuration}s</p>
+                    </div>
                 </div>
             )}
 

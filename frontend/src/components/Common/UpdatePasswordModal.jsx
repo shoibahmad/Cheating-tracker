@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Lock, CheckCircle } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
+import { auth } from '../../firebase';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 
 export const UpdatePasswordModal = ({ isOpen, onClose }) => {
     const [currentPass, setCurrentPass] = useState('');
@@ -24,33 +26,37 @@ export const UpdatePasswordModal = ({ isOpen, onClose }) => {
         }
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ current_password: currentPass, new_password: newPass })
-            });
+            const user = auth.currentUser;
+            if (!user) throw new Error("No user logged in");
 
-            if (res.ok) {
-                setStatus('success');
-                setMessage('Password updated successfully!');
-                setTimeout(() => {
-                    onClose();
-                    setCurrentPass('');
-                    setNewPass('');
-                    setStatus(null);
-                }, 2000);
-            } else {
-                const data = await res.json();
-                setStatus('error');
-                setMessage(data.detail || 'Failed to update password');
-            }
+            // 1. Re-authenticate
+            const credential = EmailAuthProvider.credential(user.email, currentPass);
+            await reauthenticateWithCredential(user, credential);
+
+            // 2. Update Password
+            await updatePassword(user, newPass);
+
+            setStatus('success');
+            setMessage('Password updated successfully!');
+            setTimeout(() => {
+                onClose();
+                setCurrentPass('');
+                setNewPass('');
+                setStatus(null);
+            }, 2000);
+
         } catch (err) {
+            console.error(err);
             setStatus('error');
-            setMessage('Error connecting to server');
+            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                setMessage('Incorrect current password');
+            } else if (err.code === 'auth/weak-password') {
+                setMessage('Password should be at least 6 characters');
+            } else if (err.code === 'auth/requires-recent-login') {
+                setMessage('Please log out and log in again');
+            } else {
+                setMessage(err.message || 'Failed to update password');
+            }
         } finally {
             setLoading(false);
         }

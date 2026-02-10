@@ -12,6 +12,7 @@ firebase-debug.*.log*
 firestore.rules
 firestore.indexes.json
 firebase.json
+backend/eval-6be19-firebase-adminsdk-fbsvc-0693781b8f.json
 
 # Firebase config
 

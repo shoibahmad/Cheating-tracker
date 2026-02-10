@@ -178,7 +178,7 @@ export const StudentDashboard = () => {
                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.subject} • {p.questions?.length || 0} Questions</div>
                                     </div>
                                     {/* For now, just a view button or similar, or create a mock session to practice */}
-                                    <button className="btn-text" disabled title="Practice Mode Coming Soon">Practice</button>
+                                    <button className="btn btn-secondary" disabled title="Practice Mode Coming Soon" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Practice</button>
                                 </div>
                             ))}
                         </div>
