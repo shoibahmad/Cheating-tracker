@@ -212,6 +212,57 @@ def delete_student(student_id: str):
 
 # --- Session Exam Handling (Submit & Score) ---
 
+# --- GET Endpoints for Student Portal ---
+
+@router.get("/sessions/{session_id}", tags=["Exam Session"])
+def get_session(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        session_ref = db.collection('sessions').document(session_id)
+        session_doc = session_ref.get()
+
+        if not session_doc.exists:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        session_data = session_doc.to_dict()
+        session_data['id'] = session_doc.id
+        return session_data
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error fetching session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/question-papers/{paper_id}", tags=["Exam Session"])
+def get_question_paper(paper_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        # Check 'exams' collection
+        paper_ref = db.collection('exams').document(paper_id)
+        paper_doc = paper_ref.get()
+
+        if not paper_doc.exists:
+            raise HTTPException(status_code=404, detail="Question paper not found")
+
+        paper_data = paper_doc.to_dict()
+        paper_data['id'] = paper_doc.id
+        return paper_data
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error fetching question paper: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class SubmitExamRequest(BaseModel):
     answers: dict  # { "question_id": selected_option_index }
 

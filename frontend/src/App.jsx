@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Outlet, Navigate } from 'react-router-dom';
+import { LoadingScreen } from './components/Common/LoadingScreen';
 import { Header } from './components/Layout/Header';
 import { Footer } from './components/Layout/Footer';
 // import { ProtectedRoute } from './components/ProtectedRoute'; // Replaced/Inline below
@@ -126,6 +127,19 @@ const PublicLayout = () => {
 
 
 function App() {
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (initialLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <AuthProvider>
       <Router>
