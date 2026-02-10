@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
-import { AlertTriangle, Clock, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, Smartphone } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 
 export const StudentExamPage = () => {
@@ -9,40 +9,46 @@ export const StudentExamPage = () => {
     const navigate = useNavigate();
     const videoRef = useRef(null);
     const [loading, setLoading] = useState(true);
-    const [warning, setWarning] = useState(null);
     const [terminated, setTerminated] = useState(false);
     const [terminationReason, setTerminationReason] = useState("");
 
+    // Exam State
     const [questions, setQuestions] = useState([]);
+    const [answers, setAnswers] = useState({});
+    const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes in seconds
 
+    // Monitor State
+    const [violationDuration, setViolationDuration] = useState(0);
+    const [lastViolation, setLastViolation] = useState("");
+
+    // --- 1. Fetch Exam Data ---
     useEffect(() => {
         const fetchExamData = async () => {
             try {
-                // 1. Get Session Details
                 const sessionRes = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
                 if (!sessionRes.ok) throw new Error("Session not found");
                 const sessionData = await sessionRes.json();
 
-                // Check for embedded questions first (preferred for snapshot consistency)
+                // Load Questions
                 if (sessionData.questions && sessionData.questions.length > 0) {
                     setQuestions(sessionData.questions);
-                }
-                // Fallback to fetching paper if examId exists
-                else if (sessionData.examId) {
-                    // 2. Get Question Paper
+                } else if (sessionData.examId) {
                     const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.examId}`);
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
-                    } else {
-                        console.error("Failed to load question paper");
                     }
-                } else if (sessionData.question_paper_id) { // Legacy support
+                } else if (sessionData.question_paper_id) {
                     const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
                     }
+                }
+
+                // Restore Progress
+                if (sessionData.answers) {
+                    setAnswers(sessionData.answers);
                 }
             } catch (err) {
                 console.error("Error loading exam:", err);
@@ -51,9 +57,7 @@ export const StudentExamPage = () => {
         fetchExamData();
     }, [id]);
 
-    const [answers, setAnswers] = useState({});
-
-    // Start Camera & Monitoring
+    // --- 2. Camera & Monitoring ---
     useEffect(() => {
         let intervalId;
         const startCamera = async () => {
@@ -63,15 +67,13 @@ export const StudentExamPage = () => {
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                         setLoading(false);
-
-                        // Start polling for analysis
                         intervalId = setInterval(captureAndAnalyze, 3000);
                     }
                 }
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                alert("Camera access required for exam.");
-                setLoading(false); // Should probably block access
+                alert("Camera access is required. Please allow access and refresh.");
+                setLoading(false);
             }
         };
         startCamera();
@@ -82,9 +84,7 @@ export const StudentExamPage = () => {
             }
             if (intervalId) clearInterval(intervalId);
         };
-    }, []);
-
-    const [noFaceDuration, setNoFaceDuration] = useState(0); // Seconds without face
+    }, [terminated]);
 
     const captureAndAnalyze = async () => {
         if (!videoRef.current || terminated) return;
@@ -100,32 +100,21 @@ export const StudentExamPage = () => {
             const res = await fetch(`${API_BASE_URL}/api/analyze_frame`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: id,
-                    image: imageBase64
-                })
+                body: JSON.stringify({ session_id: id, image: imageBase64 })
             });
 
             if (res.ok) {
                 const data = await res.json();
-
                 if (data.status === 'Terminated') {
                     setTerminated(true);
                     setTerminationReason(data.reason);
                 } else if (data.status === 'Flagged') {
-                    if (data.reason === 'No face detected') {
-                        setNoFaceDuration(prev => prev + 3); // Approx 3s per interval
-                    } else {
-                        // Reset timer if face returns or different flag
-                        // Actually, if 'Multiple faces', we might want immediate strict action too, 
-                        // but request specifically mentioned "not found" for 15s.
-                        if (data.reason !== 'No face detected') {
-                            setNoFaceDuration(0);
-                        }
-                    }
+                    setViolationDuration(prev => prev + 3);
+                    setLastViolation(data.reason);
                 } else {
-                    // Face detected, Active status
-                    setNoFaceDuration(0);
+                    // Reset if clear (or maybe implement slow decay for strictness)
+                    if (violationDuration > 0) setViolationDuration(prev => Math.max(0, prev - 1));
+                    setLastViolation("");
                 }
             }
         } catch (e) {
@@ -133,56 +122,68 @@ export const StudentExamPage = () => {
         }
     };
 
-    // Effect to handle 15s violation
+    // --- 3. Violation Handler (15s limit) ---
     useEffect(() => {
-        if (noFaceDuration >= 15 && !terminated) {
-            handleTermination("User not found for 15 seconds");
+        if (violationDuration >= 15 && !terminated) {
+            handleTermination(`Persistent Violation: ${lastViolation || "Suspicious Activity"}`);
         }
-    }, [noFaceDuration, terminated]);
+    }, [violationDuration, terminated, lastViolation]);
 
     const handleTermination = async (reason) => {
+        if (terminated) return;
+        setTerminated(true);
+        setTerminationReason(reason);
         try {
-            setTerminated(true);
-            setTerminationReason(reason);
-
             await fetch(`${API_BASE_URL}/api/sessions/${id}/terminate?reason=${encodeURIComponent(reason)}`, {
                 method: 'POST'
             });
-        } catch (err) {
-            console.error("Termination error", err);
-        }
+        } catch (err) { console.error(err); }
     };
 
+    // --- 4. Timer Logic (30 mins) ---
     const [submitting, setSubmitting] = useState(false);
-    const [result, setResult] = useState(null); // { score: 0, total: 0, percentage: 0 }
+    const [result, setResult] = useState(null);
 
-    // Add effect to verify questions loaded
     useEffect(() => {
-        if (!loading && questions.length === 0) {
-            console.warn("No questions loaded. Check network or assignment.");
-        }
-    }, [questions, loading]);
+        if (loading || result || terminated) return;
 
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    handleSubmit(); // Auto-submit
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [loading, result, terminated]);
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // --- 5. Submission ---
     const handleAnswerChange = (qId, optionIndex) => {
         setAnswers(prev => ({ ...prev, [qId]: optionIndex }));
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        // 1. Start Loading Animation (10 seconds)
+        if (e) e.preventDefault();
         setSubmitting(true);
 
-        // Wait 10 seconds artificially as requested
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Artificial delay for UX
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         try {
-            // 2. Submit to Backend
             const res = await fetch(`${API_BASE_URL}/api/sessions/${id}/submit`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure auth if needed, though backend currently doesn't strictly enforce it on this specific endpoint in my previous edit, but better safe.
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ answers })
             });
@@ -191,48 +192,32 @@ export const StudentExamPage = () => {
                 const data = await res.json();
                 setResult(data);
             } else {
-                console.error("Submission failed");
                 alert("Submission failed. Please try again.");
             }
         } catch (err) {
-            console.error(err);
             alert("Error connecting to server.");
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Termination Overlay - Takes precedence
+    // --- Renders ---
+
     if (terminated) {
         return (
             <div className="animate-fade-in" style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 9999,
-                backgroundColor: 'rgba(0, 0, 0, 0.95)',
-                backdropFilter: 'blur(10px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column'
+                position: 'fixed', inset: 0, zIndex: 9999,
+                backgroundColor: 'rgba(0, 0, 0, 0.95)', backdropFilter: 'blur(10px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
             }}>
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px', border: '1px solid var(--accent-alert)', boxShadow: '0 0 50px rgba(220, 38, 38, 0.3)' }}>
-                    <div style={{ color: 'var(--accent-alert)', marginBottom: '1rem' }}>
-                        <AlertTriangle size={64} style={{ margin: '0 auto' }} />
-                    </div>
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px', border: '1px solid var(--accent-alert)' }}>
+                    <div style={{ color: 'var(--accent-alert)', marginBottom: '1rem' }}><AlertTriangle size={64} style={{ margin: '0 auto' }} /></div>
                     <h2 style={{ color: 'var(--accent-alert)', marginBottom: '1rem', fontSize: '2rem' }}>SESSION TERMINATED</h2>
-                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
-                        The system has detected a critical violation of exam protocols.
-                    </p>
-
+                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>The system has detected a critical violation.</p>
                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem' }}>
-                        <p style={{ margin: 0, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.7 }}>Reason</p>
+                        <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>REASON</p>
                         <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.2rem', fontWeight: 'bold' }}>{terminationReason}</p>
                     </div>
-
                     <button className="btn btn-secondary" onClick={() => navigate('/student')} style={{ width: '100%', padding: '1rem' }}>Return to Dashboard</button>
                 </div>
             </div>
@@ -242,77 +227,48 @@ export const StudentExamPage = () => {
     if (result) {
         return (
             <div className="animate-fade-in" style={{
-                position: 'fixed',
-                top: 0, left: 0, right: 0, bottom: 0,
-                zIndex: 9999,
+                position: 'fixed', inset: 0, zIndex: 9999,
                 backgroundColor: 'var(--bg-primary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
                 <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem', maxWidth: '400px' }}>
                     <CheckCircle size={64} style={{ color: 'var(--accent-success)', margin: '0 auto 1.5rem' }} />
                     <h2 style={{ marginBottom: '1rem' }}>Exam Completed</h2>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Your answers have been submitted successfully.</p>
-
-                    <div style={{
-                        background: 'rgba(52, 211, 153, 0.1)',
-                        padding: '2rem',
-                        borderRadius: '16px',
-                        marginBottom: '2rem',
-                        border: '1px solid var(--accent-success)'
-                    }}>
-                        <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--accent-success)' }}>{result.percentage}%</div>
-                        <div style={{ opacity: 0.8 }}>Score: {result.score} / {result.total}</div>
-                    </div>
-
+                    <p style={{ marginBottom: '2rem' }}>Score: {result.score} / {result.total} ({result.percentage}%)</p>
                     <button className="btn btn-primary" onClick={() => navigate('/student')} style={{ width: '100%', padding: '1rem' }}>Return to Dashboard</button>
                 </div>
             </div>
         );
     }
 
-
     return (
         <div className="animate-fade-in" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 120px)', position: 'relative' }}>
 
-            {/* Loading Overlay */}
+            {/* Loading / Submitting Overlay */}
             {(loading || submitting) && (
                 <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    zIndex: 9999,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    backdropFilter: 'blur(5px)',
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
                 }}>
                     <LoadingScreen />
-                    {submitting && <p style={{ marginTop: '2rem', fontSize: '1.2rem', color: 'var(--accent-primary)', animation: 'pulse 2s infinite' }}>Submitting Exam... Please Wait</p>}
+                    {submitting && <p style={{ marginTop: '2rem', color: 'var(--accent-primary)' }}>Submitting Exam...</p>}
                 </div>
             )}
 
-            {/* Red Alert Overlay - Show when face not found but not yet terminated */}
-            {noFaceDuration > 0 && !terminated && (
+            {/* Red Alert Overlay */}
+            {violationDuration > 0 && !terminated && (
                 <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    zIndex: 9990,
-                    backgroundColor: 'rgba(220, 38, 38, 0.3)', // Red tint
+                    position: 'fixed', inset: 0, zIndex: 9990,
+                    backgroundColor: 'rgba(220, 38, 38, 0.3)', pointerEvents: 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    pointerEvents: 'none', // Allow clicking through if needed, or strictly block
                     border: '10px solid var(--accent-alert)'
                 }}>
-                    <div style={{
-                        backgroundColor: '#000',
-                        color: 'var(--accent-alert)',
-                        padding: '2rem',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                        border: '2px solid var(--accent-alert)',
-                        boxShadow: '0 0 50px rgba(220, 38, 38, 0.5)'
-                    }}>
-                        <AlertTriangle size={64} style={{ margin: '0 auto 1rem', animation: 'pulse 0.5s infinite' }} />
-                        <h2 style={{ fontSize: '2rem', fontWeight: 'bold' }}>RED ALERT</h2>
-                        <p style={{ fontSize: '1.2rem' }}>FACE NOT DETECTED!</p>
-                        <p style={{ marginTop: '1rem', color: '#fff' }}>Exam will terminate in: {15 - noFaceDuration}s</p>
+                    <div style={{ backgroundColor: '#000', padding: '2rem', borderRadius: '12px', textAlign: 'center', border: '2px solid var(--accent-alert)' }}>
+                        <AlertTriangle size={64} style={{ color: 'var(--accent-alert)', margin: '0 auto 1rem', animation: 'pulse 0.5s infinite' }} />
+                        <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent-alert)' }}>RED ALERT</h2>
+                        <p style={{ fontSize: '1.2rem' }}>{lastViolation || "SUSPICIOUS ACTIVITY"}</p>
+                        <p style={{ marginTop: '1rem', color: '#fff' }}>Terminating in: {Math.max(0, 15 - violationDuration)}s</p>
                     </div>
                 </div>
             )}
@@ -324,83 +280,76 @@ export const StudentExamPage = () => {
                         <h2 style={{ fontSize: '1.5rem', margin: 0 }}>University Final Examination</h2>
                         <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Session ID: {id}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                        <Clock size={18} /> Time Left: 58:20
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', fontWeight: 'bold', color: timeLeft < 300 ? 'var(--accent-alert)' : 'var(--text-primary)' }}>
+                        <Clock size={20} /> {formatTime(timeLeft)}
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     {questions.length === 0 && !loading ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            No questions found for this exam. Please contact your administrator.
-                        </div>
+                        <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.7 }}>No questions loaded.</div>
                     ) : (
                         questions.map((q, i) => (
                             <div key={q.id} style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                                <p style={{ fontWeight: 500, marginBottom: '1rem', fontSize: '1.1rem' }}>
-                                    <span style={{ color: 'var(--accent-primary)', marginRight: '8px' }}>Q{i + 1}.</span>
+                                <p style={{ fontWeight: 500, marginBottom: '1.5rem', fontSize: '1.1rem', lineHeight: '1.6' }}>
+                                    <span style={{ color: 'var(--accent-primary)', marginRight: '8px', fontWeight: 'bold' }}>Q{i + 1}.</span>
                                     {q.text}
                                 </p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {q.options?.map((opt, optIdx) => (
                                         <label key={optIdx} style={{
                                             display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '12px',
+                                            alignItems: 'flex-start', // Better for wrapping text
+                                            gap: '16px',
                                             cursor: 'pointer',
-                                            padding: '10px',
+                                            padding: '12px 16px',
                                             borderRadius: '8px',
-                                            background: answers[q.id] === optIdx ? 'rgba(52, 211, 153, 0.1)' : 'transparent',
-                                            border: answers[q.id] === optIdx ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                                            transition: 'all 0.2s'
+                                            background: answers[q.id || i] === optIdx ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
+                                            border: answers[q.id || i] === optIdx ? '1px solid var(--accent-success)' : '1px solid rgba(255,255,255,0.1)',
+                                            transition: 'all 0.2s ease',
                                         }}>
                                             <input
                                                 type="radio"
-                                                name={`q${q.id}`}
-                                                onChange={() => handleAnswerChange(q.id, optIdx)}
-                                                checked={answers[q.id] === optIdx}
-                                                style={{ accentColor: 'var(--accent-primary)' }}
+                                                name={`q_${q.id || i}`}
+                                                onChange={() => handleAnswerChange(q.id || i, optIdx)}
+                                                checked={answers[q.id || i] === optIdx}
+                                                style={{ marginTop: '4px', accentColor: 'var(--accent-primary)', width: '16px', height: '16px', flexShrink: 0 }}
                                             />
-                                            <span style={{ opacity: 0.9 }}>{opt}</span>
+                                            <span style={{ fontSize: '1rem', opacity: 0.9, lineHeight: '1.5' }}>{opt}</span>
                                         </label>
                                     ))}
                                 </div>
                             </div>
                         ))
                     )}
+
                     {questions.length > 0 && (
-                        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem' }}>Submit Exam</button>
+                        <div style={{ marginTop: '3rem', textAlign: 'center' }}>
+                            <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem', borderRadius: '50px' }}>
+                                Submit Final Exam
+                            </button>
                         </div>
                     )}
                 </form>
             </div>
 
-            {/* Sidebar Monitoring Preview */}
-            <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+            {/* Sidebar Monitoring */}
+            <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ padding: '0.8rem', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--glass-border)' }}>
                         <h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '8px', height: '8px', background: 'var(--accent-error)', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
+                            <div style={{ width: '8px', height: '8px', background: 'var(--accent-error)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
                             Live Proctoring
                         </h4>
                     </div>
-                    <div style={{ height: '200px', background: '#000', position: 'relative' }}>
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-                        />
-                        <div style={{ position: 'absolute', bottom: '10px', right: '10px', padding: '4px 8px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', fontSize: '0.7rem' }}>
-                            Status: Active
-                        </div>
+                    <div style={{ height: '210px', background: '#000', position: 'relative' }}>
+                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                        <div style={{ position: 'absolute', bottom: '10px', right: '10px', padding: '4px 8px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', fontSize: '0.7rem' }}>Status: Monitoring</div>
                     </div>
-                    <div style={{ padding: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        <p style={{ margin: 0 }}>• Keep face within frame</p>
-                        <p style={{ margin: 0 }}>• No other persons allowed</p>
-                        <p style={{ margin: 0 }}>• Audio is being recorded</p>
+                    <div style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> Face visible at all times</div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> No electronic devices</div>
+                        <div style={{ display: 'flex', gap: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> No unauthorized persons</div>
                     </div>
                 </div>
             </div>

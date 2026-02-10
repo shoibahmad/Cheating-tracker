@@ -19,6 +19,7 @@ export const Header = () => {
 
     // Define Navigation Links
     const commonLinks = [
+        { path: '/docs', label: 'API Docs', icon: FileText },
         { path: '/settings', label: 'Settings', icon: Settings },
     ];
 
@@ -44,7 +45,8 @@ export const Header = () => {
         // Public / Guest
         navLinks = [
             { path: '/', label: 'Home', icon: LayoutDashboard },
-            { path: '/about', label: 'About', icon: Activity }
+            { path: '/about', label: 'About', icon: Activity },
+            { path: '/docs', label: 'API Docs', icon: FileText }
         ];
     }
 

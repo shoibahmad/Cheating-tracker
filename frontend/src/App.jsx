@@ -150,13 +150,28 @@ function App() {
             <Route element={<PublicRouteGuard><PublicLayout /></PublicRouteGuard>}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/docs" element={<APIDocsPage />} />
               <Route path="/get-started" element={<GetStartedPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               {/* Student Login alias if needed */}
               <Route path="/student/login" element={<StudentLogin />} />
+            </Route>
+
+            {/* Publicly Accessible Routes (with Header/Footer) */}
+            <Route element={<DashboardLayout />}>
+              {/* Reuse DashboardLayout for consistent Header/Footer, or PublicLayout if prefered. 
+                     DashboardLayout check: it renders Header and Footer. 
+                     But DashboardLayout doesn't force auth check in itself, the ProtectedRoute wrapper does.
+                     So we can use it here for authenticated users, but what about guests?
+                     Guests using DashboardLayout might be weird if it has "sidebar" logic or specific user checks?
+                     Header.jsx handles user state safely. 
+                     Let's use PublicLayout for /docs but make it accessible.
+                 */}
+            </Route>
+
+            <Route element={<PublicLayout />}>
+              <Route path="/docs" element={<APIDocsPage />} />
             </Route>
 
             {/* Protected Dashboard Routes */}
