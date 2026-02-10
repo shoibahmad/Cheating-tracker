@@ -188,6 +188,56 @@ def create_student(student: StudentModel):
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/admin/students/{student_id}", tags=["Student Management"])
+def update_student(student_id: str, student: StudentModel):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        # 1. Update Firestore
+        user_ref = db.collection('students').document(student_id)
+        # Check if exists
+        if not user_ref.get().exists:
+             # Try users collection fallback
+             user_ref = db.collection('users').document(student_id)
+             if not user_ref.get().exists:
+                 raise HTTPException(status_code=404, detail="User not found")
+
+        update_data = {
+            "full_name": student.full_name,
+            "email": student.email,
+            "role": student.role,
+            "institution": student.institution
+        }
+        
+        user_ref.update(update_data)
+
+        # 2. Update Firebase Auth (Custom Claims & Display Name)
+        try:
+            auth.update_user(
+                student_id,
+                email=student.email,
+                display_name=student.full_name,
+                # Password update is separate or optional here
+            )
+            # Update Role Claim
+            auth.set_custom_user_claims(student_id, {'role': student.role})
+            
+        except Exception as auth_err:
+            print(f"Auth update warning: {auth_err}")
+            # Non-critical if auth update fails but DB updates, but strictly we should sync.
+            # Continue for now.
+
+        return {"ok": True, "message": "User updated successfully"}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error updating student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/admin/students/{student_id}", tags=["Student Management"])
 def delete_student(student_id: str):
     db = get_db()

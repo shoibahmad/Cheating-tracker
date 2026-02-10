@@ -264,6 +264,19 @@ export const StudentManagementPage = () => {
                                 />
                             </div>
                             <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Role</label>
+                                <select
+                                    className="glass-input"
+                                    value={formData.role}
+                                    onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                    style={{ width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: 'white' }}
+                                >
+                                    <option value="student" style={{ color: 'black' }}>Student</option>
+                                    <option value="admin" style={{ color: 'black' }}>Admin</option>
+                                </select>
+                            </div>
+
+                            <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Institution</label>
                                 <input
                                     className="glass-input"

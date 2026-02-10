@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
@@ -21,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 export const CreatePaperPage = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    const fileInputRef = useRef(null);
     const [title, setTitle] = useState('');
     const [subject, setSubject] = useState('');
     const [questions, setQuestions] = useState([
@@ -163,6 +163,8 @@ export const CreatePaperPage = () => {
                                 <input
                                     type="file"
                                     accept="image/*,application/pdf"
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
                                     onChange={async (e) => {
                                         const file = e.target.files[0];
                                         if (!file) return;
@@ -216,12 +218,16 @@ export const CreatePaperPage = () => {
                                             console.error(err);
                                             toast.error("Error uploading file", { id: toastId });
                                         }
-                                    }}
-                                    style={{
-                                        position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', left: 0, top: 0
+
+                                        // Reset input so validation triggers again if same file selected (optional)
+                                        e.target.value = null;
                                     }}
                                 />
-                                <button type="button" className="btn btn-secondary">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => fileInputRef.current.click()}
+                                >
                                     <BookOpen size={16} style={{ marginRight: '8px' }} /> Upload Scan
                                 </button>
                             </div>
