@@ -32,6 +32,7 @@ import { StudentReportsPage } from './pages/Student/StudentReportsPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { CreatePaperPage } from './pages/Admin/CreatePaperPage';
 import { AssignExamPage } from './pages/Admin/AssignExamPage';
+import { LiveFeedPage } from './pages/Admin/LiveFeedPage';
 
 
 import { Toaster } from 'react-hot-toast';
@@ -113,9 +114,7 @@ const PublicLayout = () => {
       <div className="shape shape-2" />
 
       {/* Reuse Header Component for consistency */}
-      <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
-        <Header title="SecureEval" />
-      </div>
+      <Header title="SecureEval" />
 
       <div style={{ marginTop: '2rem', flex: 1 }}>
         <Outlet />
@@ -191,6 +190,7 @@ function App() {
                 <Route path="/admin/create-paper" element={<CreatePaperPage />} />
                 <Route path="/admin/assign-exam" element={<AssignExamPage />} />
                 <Route path="/admin/students" element={<StudentManagementPage />} />
+                <Route path="/admin/live-feed" element={<LiveFeedPage />} />
                 <Route path="/schedule" element={<ScheduleExamPage />} />
                 <Route path="/monitor" element={<MonitorSelectionPage />} />
                 <Route path="/monitor/:id" element={<MonitorPage />} />

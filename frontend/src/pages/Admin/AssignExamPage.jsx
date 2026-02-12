@@ -63,19 +63,28 @@ export const AssignExamPage = () => {
 
             const sessionData = {
                 studentId: selectedStudentId,
-                student_name: student?.full_name || 'Unknown', // snake_case for consistency
+                student_name: student?.full_name || 'Unknown',
                 examId: selectedPaper,
                 examTitle: paper?.title || 'Untitled Exam',
-                exam_type: examType,
-                status: 'Active',
-                questions: paper?.questions || [],
-                trust_score: 100, // Initialize trust score
-                createdAt: serverTimestamp()
+                exam_type: examType
             };
 
-            const docRef = await addDoc(collection(db, "sessions"), sessionData);
+            // Use Backend API - SQLite
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(sessionData)
+            });
 
-            setGeneratedSession({ session_id: docRef.id });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to create session');
+            }
+
+            const data = await response.json();
+            setGeneratedSession({ session_id: data.session_id });
             toast.success("Exam assigned successfully!");
         } catch (err) {
             console.error(err);

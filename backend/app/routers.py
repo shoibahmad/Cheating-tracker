@@ -2,14 +2,58 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 import json
+from datetime import datetime
 import cv2
 import numpy as np
 import base64
 from backend.app.ai_service import extract_exam_and_insights
-from firebase_admin import auth, firestore
+from backend.app.ai_service import extract_exam_and_insights
+from firebase_admin import auth
+from firebase_admin import firestore as admin_firestore # Rename to avoid confusion
+from google.cloud import firestore # For Query.DESCENDING
 from backend.app.firebase_setup import get_db
 
 router = APIRouter()
+
+
+
+@router.get("/admin/exams/history", tags=["Exam Session"])
+def get_session_history():
+    print("Fetching session history from Firestore (list_history)...")
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        # Fetch ALL sessions (Fetch all then sort to avoid missing docs without created_at)
+        sessions_ref = db.collection("sessions")
+        docs = sessions_ref.stream()
+        
+        sessions_data = []
+        for doc in docs:
+            data = doc.to_dict()
+            
+            sessions_data.append({
+                "id": doc.id,
+                "student_name": data.get('student_name'),
+                "studentId": data.get('studentId'),
+                "exam_title": data.get('exam_title'),
+                "exam_type": data.get('exam_type', "University"),
+                "status": data.get('status'),
+                "trust_score": data.get('trust_score'),
+                "score": data.get('score', 0),
+                "latest_log": data.get('latest_log'),
+                "created_at": data.get('created_at', "")
+            })
+            
+        print(f"Total sessions found: {len(sessions_data)}")
+        # Sort by created_at desc
+        sessions_data.sort(key=lambda x: x['created_at'] or "", reverse=True)
+            
+        return sessions_data
+    except Exception as e:
+        print(f"Error fetching session history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- OCR Routes ---
 @router.post("/ocr/upload", tags=["OCR Service"], summary="Upload Exam Paper", description="Uploads an image or PDF exam paper, extracts text via OCR/AI, and returns structured questions.")
@@ -47,7 +91,7 @@ class FrameData(BaseModel):
     session_id: str
     image: str
 
-@router.post("/analyze_frame", tags=["Monitoring Service"], summary="Analyze Webcam Frame", description="Analyzes a single webcam frame for face detection to identify potential cheating (no face, multiple faces).")
+@router.post("/analyze_frame", tags=["Monitoring Service"], summary="Analyze Webcam Frame")
 def analyze_frame(data: FrameData):
     if face_cascade is None:
         return {"status": "Error", "message": "Face detection unavailble"}
@@ -80,29 +124,54 @@ def analyze_frame(data: FrameData):
         # DB Logging if suspicious
         if is_suspicious:
             db = get_db()
-            if db:
-                session_ref = db.collection('sessions').document(data.session_id)
-                # Check if session is already terminated, if so, don't log more (optional, but good practice)
-                # For speed, we might skip reading first, but let's just write.
+            if not db:
+                 print("Firestore connection failed")
+                 return {"status": "Error", "message": "Database error"}
+                 
+            try:
+                session_ref = db.collection("sessions").document(data.session_id)
+                session_doc = session_ref.get()
                 
-                log_entry = {
-                    "timestamp": firestore.SERVER_TIMESTAMP,
-                    "message": reason
-                }
-                
-                # Update session with log and latest alert
-                # Also decrement trust score slightly for real-time impact? 
-                # Let's just log for now as requested.
-                session_ref.update({
-                    "logs": firestore.ArrayUnion([log_entry]),
-                    "latest_log": reason,
-                    "status": "Flagged" # Ensure status is flagged
-                })
+                if session_doc.exists:
+                    session_data = session_doc.to_dict()
+                    if session_data.get('status') == 'Active':
+                        # STRICT TERMINATION LOGIC
+                        termination_reason = f"Zero Tolerance Violation: {reason}"
+                        
+                        # Update Session
+                        session_ref.update({
+                            "status": "Terminated",
+                            "termination_reason": termination_reason,
+                            "trust_score": 0,
+                            "latest_log": f"Terminated: {reason}"
+                        })
+                        
+                        # Log to subcollection
+                        log_entry = {
+                            "message": f"Terminated: {reason}",
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+                        session_ref.collection("logs").add(log_entry)
+                        
+                        return {
+                            "status": "Terminated", 
+                            "face_count": face_count,
+                            "reason": termination_reason
+                        }
+                    elif session_data.get('status') == 'Terminated':
+                         return {
+                            "status": "Terminated", 
+                            "face_count": face_count,
+                            "reason": session_data.get('termination_reason')
+                        }
+
+            except Exception as e:
+                print(f"Error logging to Firestore: {e}")
 
         return {
-            "status": "Flagged" if is_suspicious else "Active", 
+            "status": "Active", 
             "face_count": face_count,
-            "reason": reason if is_suspicious else None
+            "reason": None
         }
 
     except Exception as e:
@@ -262,138 +331,234 @@ def delete_student(student_id: str):
 
 # --- Session Exam Handling (Submit & Score) ---
 
-# --- GET Endpoints for Student Portal ---
+class CreateSessionRequest(BaseModel):
+    studentId: str
+    student_name: str
+    examId: str
+    examTitle: str
+    exam_type: str 
+
+@router.post("/sessions", tags=["Exam Session"])
+def create_session(data: CreateSessionRequest):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        # Generate ID (or let Firestore do it, but we want to return it)
+        # Using Firestore auto-id by creating a doc ref first
+        new_session_ref = db.collection("sessions").document()
+        
+        session_data = {
+            "studentId": data.studentId,
+            "student_name": data.student_name,
+            "exam_id": data.examId,
+            "exam_title": data.examTitle,
+            "exam_type": data.exam_type,
+            "status": "Active",
+            "trust_score": 100,
+            "created_at": datetime.utcnow().isoformat(),
+            "termination_reason": None
+        }
+        
+        new_session_ref.set(session_data)
+        
+        return {"session_id": new_session_ref.id}
+    except Exception as e:
+        print(f"Error creating session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
 @router.get("/sessions/{session_id}", tags=["Exam Session"])
 def get_session(session_id: str):
     db = get_db()
     if not db:
         raise HTTPException(status_code=500, detail="Database connection failed")
-
+        
     try:
-        session_ref = db.collection('sessions').document(session_id)
-        session_doc = session_ref.get()
-
-        if not session_doc.exists:
+        doc = db.collection("sessions").document(session_id).get()
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Session not found")
+            
+        data = doc.to_dict()
+        data['id'] = doc.id
+        
+        # Check if completed/terminated
+        if data.get('status') in ['Completed', 'Terminated']:
+             return {
+                 "id": data['id'],
+                 "status": data.get('status'),
+                 "score": data.get('score', 0), 
+                 "termination_reason": data.get('termination_reason')
+             }
 
-        session_data = session_doc.to_dict()
-        session_data['id'] = session_doc.id
-        return session_data
+        # Fetch questions from Firestore
+        questions = []
+        exam_id = data.get('exam_id')
+        if exam_id:
+            paper_ref = db.collection('exams').document(exam_id)
+            paper_doc = paper_ref.get()
+            if paper_doc.exists:
+                questions = paper_doc.to_dict().get('questions', [])
 
-    except HTTPException as he:
-        raise he
+        return {
+            "id": data['id'],
+            "student_id": data.get('studentId'),
+            "exam_id": data.get('exam_id'),
+            "status": data.get('status'),
+            "questions": questions,
+            "trust_score": data.get('trust_score')
+        }
+
     except Exception as e:
         print(f"Error fetching session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.get("/question-papers/{paper_id}", tags=["Exam Session"])
-def get_question_paper(paper_id: str):
+@router.get("/sessions", tags=["Exam Session"])
+def get_active_sessions():
     db = get_db()
     if not db:
         raise HTTPException(status_code=500, detail="Database connection failed")
-
+        
     try:
-        # Check 'exams' collection
-        paper_ref = db.collection('exams').document(paper_id)
-        paper_doc = paper_ref.get()
-
-        if not paper_doc.exists:
-            raise HTTPException(status_code=404, detail="Question paper not found")
-
-        paper_data = paper_doc.to_dict()
-        paper_data['id'] = paper_doc.id
-        return paper_data
-
-    except HTTPException as he:
-        raise he
+        # Fetch status in ['Active', 'Flagged']
+        sessions_ref = db.collection("sessions")
+        # Firestore 'IN' query
+        query = sessions_ref.where("status", "in", ["Active", "Flagged"])
+        docs = query.stream()
+        
+        sessions_data = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+            
+            # Fetch latest log? This is expensive in Firestore if in subcollection.
+            # Assuming 'latest_log' is kept in the main doc for efficiency (as per analyze_frame update)
+            
+            sessions_data.append({
+                "id": data['id'],
+                "student_name": data.get('student_name'),
+                "studentId": data.get('studentId'),
+                "exam_title": data.get('exam_title'),
+                "status": data.get('status'),
+                "trust_score": data.get('trust_score'),
+                "latest_log": data.get('latest_log')
+            })
+            
+        return sessions_data
     except Exception as e:
-        print(f"Error fetching question paper: {e}")
+        print(f"Error fetching active sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sessions/{session_id}/logs", tags=["Exam Session"])
+def get_session_logs(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        # Fetch logs from subcollection
+        logs_ref = db.collection("sessions").document(session_id).collection("logs")
+        query = logs_ref.order_by("timestamp", direction=firestore.Query.DESCENDING)
+        docs = query.stream()
+        
+        logs = []
+        for doc in docs:
+            logs.append(doc.to_dict())
+            
+        return logs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sessions/{session_id}/status", tags=["Exam Session"])
+def get_session_status(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        doc_ref = db.collection("sessions").document(session_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+             raise HTTPException(status_code=404, detail="Session not found")
+        
+        data = doc.to_dict()
+        
+        # Fetch latest logs for alerts
+        # Assuming we just return latest message stored in doc or query subcollection limit 5
+        # Let's query subcollection for better detail
+        logs_ref = doc_ref.collection("logs").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(5)
+        log_docs = logs_ref.stream()
+        alert_messages = [l.to_dict().get('message') for l in log_docs]
+
+        return {
+            "status": data.get('status'),
+            "trust_score": data.get('trust_score'),
+            "latest_logs": alert_messages,
+            "termination_reason": data.get('termination_reason')
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 class SubmitExamRequest(BaseModel):
-    answers: dict  # { "question_id": selected_option_index }
+    answers: dict
 
 @router.post("/sessions/{session_id}/submit", tags=["Exam Session"])
 def submit_exam(session_id: str, submission: SubmitExamRequest):
     db = get_db()
     if not db:
         raise HTTPException(status_code=500, detail="Database connection failed")
-
+        
     try:
-        # 1. Fetch Session
-        session_ref = db.collection('sessions').document(session_id)
+        session_ref = db.collection("sessions").document(session_id)
         session_doc = session_ref.get()
-
+        
         if not session_doc.exists:
             raise HTTPException(status_code=404, detail="Session not found")
+            
+        data = session_doc.to_dict()
+        if data.get('status') == 'Completed':
+             return {"message": "Already submitted"}
 
-        session_data = session_doc.to_dict()
-
-        if session_data.get('status') == 'Completed':
-             return {"message": "Exam already submitted", "score": session_data.get('score'), "total": len(session_data.get('questions', [])), "percentage": session_data.get('percentage', 0)}
-
-        # 2. Get Questions (Embedded in Session)
-        questions = session_data.get('questions', [])
-        if not questions:
-            # Fallback for older sessions without embedded questions (legacy)
-             # You might need to fetch from exams collection if using examId
-             # For now, assume questions are embedded as per fix in AssignExamPage
-             pass 
-
-        # 3. Calculate Score
+        # Calculate Score
         score = 0
-        total_questions = len(questions)
-
-        for i, q in enumerate(questions):
-            # Question IDs in frontend might be indices if not explicitly set
-            # Assuming frontend sends index as key or we iterate by index
-            # The structure from CreatePaperPage is: questions is an array.
-            # StudentExamPage map uses index as key if q.id is missing.
-            
-            # Since frontend uses q.id or index, let's correspond.
-            # Convert submission keys to integers if possible
-            
-            # Let's assume submission.answers keys match questions indices for now if no IDs
-            # But wait, CreatePaperPage doesn't seem to assign unique IDs to questions, just array index.
-            # StudentExamPage uses `q.id` which might be undefined, falling back to index?
-            # Let's check StudentExamPage again. It uses `q.id` in `key={q.id}`. 
-            # If questions from CreatePaperPage don't have IDs, this is a problem.
-            # But let's assume valid array index mapping for now.
-            
-            q_id = str(q.get('id', i)) # Fallback to index if no ID
-            
-            user_answer = submission.answers.get(str(q_id)) # Keys are strings in JSON
-            
-            # Correct answer is index
-            correct_answer = q.get('correct_answer')
-            
-            if user_answer is not None and int(user_answer) == int(correct_answer):
-                score += 1
-
-        # 4. Update Session in Firestore
-        percentage = (score / total_questions * 100) if total_questions > 0 else 0
+        total = 0
+        percentage = 0
         
+        exam_id = data.get('exam_id')
+        if exam_id:
+            paper_ref = db.collection('exams').document(exam_id)
+            paper_doc = paper_ref.get()
+            if paper_doc.exists:
+                questions = paper_doc.to_dict().get('questions', [])
+                total = len(questions)
+                for i, q in enumerate(questions):
+                    q_id = str(q.get('id', i))
+                    user_answer = submission.answers.get(str(q_id))
+                    correct_answer = q.get('correct_answer')
+                    if user_answer is not None and str(user_answer) == str(correct_answer):
+                        score += 1
+
+        percentage = (score / total * 100) if total > 0 else 0
+
+        # Update Firestore
         session_ref.update({
-            'status': 'Completed',
-            'score': score,
-            'total_questions': total_questions,
-            'percentage': round(percentage, 2),
-            'answers': submission.answers,
-            'submittedAt': firestore.SERVER_TIMESTAMP
+            "status": "Completed",
+            "score": score,
+            "total": total,
+            "percentage": round(percentage, 2)
         })
 
         return {
             "message": "Exam submitted successfully",
             "score": score,
-            "total": total_questions,
+            "total": total,
             "percentage": round(percentage, 2)
         }
 
-    except HTTPException as he:
-        raise he
     except Exception as e:
         print(f"Error submitting exam: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -404,20 +569,17 @@ def terminate_exam(session_id: str, reason: str = "Violation of exam protocols")
     db = get_db()
     if not db:
         raise HTTPException(status_code=500, detail="Database connection failed")
-
-    try:
-        session_ref = db.collection('sessions').document(session_id)
         
-        # Verify session exists
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        
         if not session_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Session not found")
+             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Update session status and trust score
         session_ref.update({
-            'status': 'Terminated',
-            'trust_score': 0,
-            'termination_reason': reason,
-            'terminatedAt': firestore.SERVER_TIMESTAMP
+            "status": "Terminated",
+            "termination_reason": reason,
+            "trust_score": 0
         })
 
         return {"message": "Exam terminated successfully"}
@@ -425,4 +587,25 @@ def terminate_exam(session_id: str, reason: str = "Violation of exam protocols")
     except Exception as e:
         print(f"Error terminating exam: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/sessions/{session_id}", tags=["Exam Session"])
+def delete_session(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        # Note: Firestore doesn't automatically delete subcollections (logs).
+        # We should delete logs explicitly if possible, or use a recursive delete function.
+        # For simplicity in this scope:
+        db.collection("sessions").document(session_id).delete()
+        
+        return {"message": "Session deleted successfully"}
+    except Exception as e:
+        print(f"Error deleting session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 

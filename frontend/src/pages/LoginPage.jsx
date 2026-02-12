@@ -176,7 +176,7 @@ export const LoginPage = () => {
                     </div>
 
                     <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
-                        <a href="/forgot-password" style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textDecoration: 'none' }}>Forgot Password?</a>
+                        <Link to="/forgot-password" style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textDecoration: 'none' }}>Forgot Password?</Link>
                     </div>
 
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '1.5rem' }} disabled={loading}>

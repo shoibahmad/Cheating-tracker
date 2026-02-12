@@ -70,7 +70,11 @@ export const MonitorView = ({ session, onBack }) => {
                     setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${data.reason}`, ...prev]);
                     setTerminationReason(data.reason);
                     setShowTerminationModal(true);
-                    // Do NOT call onBack() automatically anymore, let user click the button
+                } else if (data.status === 'Flagged') {
+                    setAlertState(true);
+                    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${data.reason}`, ...prev]);
+                    // Clear alert after 2 seconds
+                    setTimeout(() => setAlertState(false), 2000);
                 }
             }
         } catch (e) {

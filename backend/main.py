@@ -62,6 +62,8 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 
+
+
 # Serve React static assets (JS, CSS, Images)
 # Mount "assets" from the build folder
 app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
@@ -85,3 +87,7 @@ async def serve_react_app(full_path: str):
         return FileResponse(index_path)
         
     return {"message": "Frontend build not found. Please run build script."}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

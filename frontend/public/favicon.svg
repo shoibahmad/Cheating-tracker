@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Shield Background -->
+  <path d="M50 5 L90 20 V50 C90 75 50 95 50 95 C50 95 10 75 10 50 V20 L50 5 Z" fill="#0f172a" stroke="#10b981" stroke-width="4"/>
+  
+  <!-- Stylized Eye -->
+  <path d="M25 50 Q50 25 75 50 Q50 75 25 50 Z" fill="none" stroke="#10b981" stroke-width="4"/>
+  <circle cx="50" cy="50" r="10" fill="#10b981">
+    <animate attributeName="r" values="10;12;10" dur="2s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Digital Circuit Details -->
+  <path d="M50 25 V35 M50 65 V75 M25 50 H35 M65 50 H75" stroke="#10b981" stroke-width="2" opacity="0.5"/>
+</svg>

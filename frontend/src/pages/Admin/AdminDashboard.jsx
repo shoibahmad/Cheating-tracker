@@ -24,8 +24,10 @@ import {
     TrendingUp,
     Activity,
     CheckCircle,
-    Edit
+    Edit,
+    Trash2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const AdminDashboard = () => {
     const [sessions, setSessions] = useState([]);
@@ -50,43 +52,66 @@ export const AdminDashboard = () => {
 
     const COLORS = ['#10b981', '#f43f5e', '#6366f1']; // Green, Red, Indigo
 
+    const loadData = async () => {
+        try {
+            // Fetch stats from SQLite Backend
+            const res = await fetch(`${API_BASE_URL}/api/admin/exams/history`);
+            if (!res.ok) throw new Error("Failed to fetch sessions");
+            const sessionsList = await res.json();
+
+            // Fetch Students (still from Firestore for now, or use backend if migrated)
+            // Keeping Firestore for students as per current hybrid approach
+            const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+            const totalStudents = usersSnapshot.size;
+
+            // Calculate Stats
+            const active = sessionsList.filter(s => s.status === 'Active').length;
+            const flagged = sessionsList.filter(s => s.status === 'Flagged' || s.status === 'Terminated').length; // Terminated counts as flagged/incident
+            const totalExams = sessionsList.length;
+
+            // Calculate Average Score (only from Completed sessions with scores)
+            const completedSessions = sessionsList.filter(s => s.status === 'Completed');
+            const avgScore = completedSessions.length > 0
+                ? Math.round(completedSessions.reduce((acc, curr) => acc + (curr.score || 0), 0) / completedSessions.length)
+                : 0;
+
+            setSessions(sessionsList); // For the table
+            setStats({
+                active,
+                flagged,
+                total_students: totalStudents,
+                avg_score: avgScore,
+                total_exams: totalExams
+            });
+        } catch (err) {
+            console.error("Error loading dashboard data:", err);
+            toast.error("Failed to load dashboard data");
+        }
+    };
+
     useEffect(() => {
-        const loadData = async () => {
-            try {
-                // Fetch stats from Firestore collections directly
-                // 1. Sessions
-                const sessionsSnapshot = await getDocs(collection(db, "sessions"));
-                const sessionsList = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                // 2. Students (Users with role='student')
-                const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
-                const totalStudents = usersSnapshot.size;
-
-                // Calculate Stats
-                const active = sessionsList.filter(s => s.status === 'Active').length;
-                const flagged = sessionsList.filter(s => s.status === 'Flagged').length;
-                const totalExams = sessionsList.length;
-
-                // Calculate Average Score (only from Completed sessions with scores)
-                const completedSessions = sessionsList.filter(s => s.score !== undefined);
-                const avgScore = completedSessions.length > 0
-                    ? Math.round(completedSessions.reduce((acc, curr) => acc + (curr.score || 0), 0) / completedSessions.length)
-                    : 0;
-
-                setSessions(sessionsList); // For the table
-                setStats({
-                    active,
-                    flagged,
-                    total_students: totalStudents,
-                    avg_score: avgScore,
-                    total_exams: totalExams
-                });
-            } catch (err) {
-                console.error("Error loading dashboard data:", err);
-            }
-        };
         loadData();
     }, []);
+
+    const handleDelete = async (sessionId) => {
+        if (!window.confirm("Are you sure you want to delete this session? This cannot be undone.")) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                toast.success("Session deleted successfully");
+                loadData(); // Reload data
+            } else {
+                toast.error("Failed to delete session");
+            }
+        } catch (err) {
+            console.error("Error deleting session:", err);
+            toast.error("Error deleting session");
+        }
+    };
 
     const statusData = [
         { name: 'Active', value: stats.active },
@@ -217,13 +242,16 @@ export const AdminDashboard = () => {
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Latest Alert</th>
+                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Actions</th>
 
                                 </tr>
                             </thead>
                             <tbody>
                                 {sessions.map(session => (
                                     <tr key={session.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} className="table-row">
-                                        <td style={{ padding: '1rem', fontFamily: 'monospace', opacity: 0.7 }}>{session.id.substring(0, 8)}...</td>
+                                        <td style={{ padding: '1rem', fontFamily: 'monospace', opacity: 0.7 }}>
+                                            {(session.id || "").toString().substring(0, 8)}...
+                                        </td>
                                         <td style={{ padding: '1rem', fontWeight: 500 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
@@ -284,6 +312,20 @@ export const AdminDashboard = () => {
                                             ) : (
                                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
                                             )}
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <button
+                                                onClick={() => handleDelete(session.id)}
+                                                style={{
+                                                    background: 'none', border: 'none', cursor: 'pointer',
+                                                    color: 'var(--text-secondary)', padding: '0.5rem',
+                                                    transition: 'color 0.2s'
+                                                }}
+                                                title="Delete Session"
+                                                className="btn-icon-danger"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
                                         </td>
 
                                     </tr>

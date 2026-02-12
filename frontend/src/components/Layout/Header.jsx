@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, Bell, X, LayoutDashboard, FileText, School, Building2, GraduationCap, Activity, Settings } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Menu, Bell, X, LayoutDashboard, FileText, School, Building2, GraduationCap, Activity, Settings, Eye } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ProfileDrawer } from './ProfileDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { Logo } from '../Common/Logo';
@@ -10,6 +10,7 @@ export const Header = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { currentUser, userRole } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Fallback name
     const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
@@ -27,6 +28,7 @@ export const Header = () => {
         { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/admin/create-paper', label: 'Create Paper', icon: FileText },
         { path: '/admin/assign-exam', label: 'Assign Exam', icon: School },
+        { path: '/admin/live-feed', label: 'Live Feed', icon: Eye },
         { path: '/institutions', label: 'Institutions', icon: Building2 },
     ];
 
@@ -94,7 +96,7 @@ export const Header = () => {
 
                 {/* Right Side Actions */}
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    {currentUser && (
+                    {currentUser ? (
                         <div className="desktop-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                             <button className="btn btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%' }}>
                                 <Bell size={20} />
@@ -129,6 +131,29 @@ export const Header = () => {
                             }}>
                                 {userRole}
                             </span>
+                        </div>
+                    ) : (
+                        <div className="desktop-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center', position: 'relative', zIndex: 1001 }}>
+                            <button
+                                onClick={() => {
+                                    console.log("Navigating to login");
+                                    navigate('/login');
+                                }}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.6rem 1.5rem', fontSize: '0.9rem', cursor: 'pointer', position: 'relative', zIndex: 1002 }}
+                            >
+                                Login
+                            </button>
+                            <button
+                                onClick={() => {
+                                    console.log("Navigating to signup");
+                                    navigate('/signup');
+                                }}
+                                className="btn btn-primary"
+                                style={{ padding: '0.6rem 1.5rem', fontSize: '0.9rem', cursor: 'pointer', position: 'relative', zIndex: 1002 }}
+                            >
+                                Sign Up
+                            </button>
                         </div>
                     )}
 
@@ -179,7 +204,7 @@ export const Header = () => {
                     </button>
                 </div>
 
-                {currentUser && (
+                {currentUser ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
                         <div style={{
                             width: '40px', height: '40px', borderRadius: '50%',
@@ -193,6 +218,25 @@ export const Header = () => {
                             <div style={{ fontWeight: 600 }}>{userName}</div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{userRole}</div>
                         </div>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', zIndex: 1002 }}>
+                        <Link
+                            to="/login"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="btn btn-secondary"
+                            style={{ width: '100%', justifyContent: 'center', cursor: 'pointer' }}
+                        >
+                            Login
+                        </Link>
+                        <Link
+                            to="/signup"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="btn btn-primary"
+                            style={{ width: '100%', justifyContent: 'center', cursor: 'pointer' }}
+                        >
+                            Sign Up
+                        </Link>
                     </div>
                 )}
 

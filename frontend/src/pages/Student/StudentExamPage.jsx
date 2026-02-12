@@ -4,6 +4,8 @@ import { API_BASE_URL } from '../../config';
 import { AlertTriangle, Clock, CheckCircle, Smartphone } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 
+import { db } from '../../firebase';
+
 export const StudentExamPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -18,8 +20,31 @@ export const StudentExamPage = () => {
     const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes in seconds
 
     // Monitor State
-    const [violationDuration, setViolationDuration] = useState(0);
-    const [lastViolation, setLastViolation] = useState("");
+    // const [violationDuration, setViolationDuration] = useState(0); // Removed for strict mode
+    // const [lastViolation, setLastViolation] = useState(""); // Removed via strict mode
+
+    // --- 0. Real-time Session Listener (Polling Mode) ---
+    useEffect(() => {
+        if (!id) return;
+
+        const checkStatus = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/sessions/${id}/status`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'Terminated' && !terminated) {
+                        setTerminated(true);
+                        setTerminationReason(data.termination_reason || "Exam terminated by administrator.");
+                    }
+                }
+            } catch (err) {
+                console.error("Status check failed", err);
+            }
+        };
+
+        const interval = setInterval(checkStatus, 5000); // Poll every 5 seconds
+        return () => clearInterval(interval);
+    }, [id, terminated]);
 
     // --- 1. Fetch Exam Data ---
     useEffect(() => {
@@ -28,6 +53,23 @@ export const StudentExamPage = () => {
                 const sessionRes = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
                 if (!sessionRes.ok) throw new Error("Session not found");
                 const sessionData = await sessionRes.json();
+
+                // Check for completion/termination immediately
+                if (sessionData.status === 'Completed') {
+                    setResult({
+                        score: sessionData.score,
+                        total: sessionData.total_questions || sessionData.questions?.length || 0,
+                        percentage: sessionData.percentage
+                    });
+                    setLoading(false);
+                    return;
+                }
+                if (sessionData.status === 'Terminated') {
+                    setTerminated(true);
+                    setTerminationReason(sessionData.termination_reason || "Exam terminated.");
+                    setLoading(false);
+                    return;
+                }
 
                 // Load Questions
                 if (sessionData.questions && sessionData.questions.length > 0) {
@@ -67,7 +109,7 @@ export const StudentExamPage = () => {
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                         setLoading(false);
-                        intervalId = setInterval(captureAndAnalyze, 3000);
+                        intervalId = setInterval(captureAndAnalyze, 1000);
                     }
                 }
             } catch (err) {
@@ -108,13 +150,6 @@ export const StudentExamPage = () => {
                 if (data.status === 'Terminated') {
                     setTerminated(true);
                     setTerminationReason(data.reason);
-                } else if (data.status === 'Flagged') {
-                    setViolationDuration(prev => prev + 3);
-                    setLastViolation(data.reason);
-                } else {
-                    // Reset if clear (or maybe implement slow decay for strictness)
-                    if (violationDuration > 0) setViolationDuration(prev => Math.max(0, prev - 1));
-                    setLastViolation("");
                 }
             }
         } catch (e) {
@@ -122,23 +157,7 @@ export const StudentExamPage = () => {
         }
     };
 
-    // --- 3. Violation Handler (15s limit) ---
-    useEffect(() => {
-        if (violationDuration >= 15 && !terminated) {
-            handleTermination(`Persistent Violation: ${lastViolation || "Suspicious Activity"}`);
-        }
-    }, [violationDuration, terminated, lastViolation]);
 
-    const handleTermination = async (reason) => {
-        if (terminated) return;
-        setTerminated(true);
-        setTerminationReason(reason);
-        try {
-            await fetch(`${API_BASE_URL}/api/sessions/${id}/terminate?reason=${encodeURIComponent(reason)}`, {
-                method: 'POST'
-            });
-        } catch (err) { console.error(err); }
-    };
 
     // --- 4. Timer Logic (30 mins) ---
     const [submitting, setSubmitting] = useState(false);
@@ -256,22 +275,7 @@ export const StudentExamPage = () => {
                 </div>
             )}
 
-            {/* Red Alert Overlay */}
-            {violationDuration > 0 && !terminated && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 9990,
-                    backgroundColor: 'rgba(220, 38, 38, 0.3)', pointerEvents: 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '10px solid var(--accent-alert)'
-                }}>
-                    <div style={{ backgroundColor: '#000', padding: '2rem', borderRadius: '12px', textAlign: 'center', border: '2px solid var(--accent-alert)' }}>
-                        <AlertTriangle size={64} style={{ color: 'var(--accent-alert)', margin: '0 auto 1rem', animation: 'pulse 0.5s infinite' }} />
-                        <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent-alert)' }}>RED ALERT</h2>
-                        <p style={{ fontSize: '1.2rem' }}>{lastViolation || "SUSPICIOUS ACTIVITY"}</p>
-                        <p style={{ marginTop: '1rem', color: '#fff' }}>Terminating in: {Math.max(0, 15 - violationDuration)}s</p>
-                    </div>
-                </div>
-            )}
+
 
             {/* Main Exam Area */}
             <div className="glass-panel" style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>

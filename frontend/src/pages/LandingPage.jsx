@@ -10,7 +10,13 @@ export const LandingPage = () => {
                 <div className="animate-fade-in">
                     <h1 style={{ fontSize: '4rem', marginBottom: '1.5rem', lineHeight: 1.1 }}>
                         Secure Evaluation <br />
-                        <span style={{ color: 'var(--accent-primary)', background: 'linear-gradient(to right, var(--accent-primary), var(--accent-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                        <span style={{
+                            background: 'linear-gradient(to right, var(--accent-primary), var(--accent-secondary))',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            color: 'transparent'
+                        }}>
                             Intelligence System
                         </span>
                     </h1>

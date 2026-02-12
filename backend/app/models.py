@@ -27,3 +27,24 @@ class Exam(SQLModel, table=True):
     status: str = "draft"
     
     questions: List[Question] = Relationship(back_populates="exam")
+
+class ExamSession(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    student_id: str 
+    student_name: str
+    exam_id: str # Firestore ID
+    exam_title: str
+    status: str = "Active" # Active, Completed, Terminated
+    trust_score: int = 100
+    created_at: str
+    termination_reason: Optional[str] = None
+    
+    logs: List["MonitoringLog"] = Relationship(back_populates="session")
+
+class MonitoringLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="examsession.id")
+    message: str
+    timestamp: str
+    
+    session: Optional[ExamSession] = Relationship(back_populates="logs")
