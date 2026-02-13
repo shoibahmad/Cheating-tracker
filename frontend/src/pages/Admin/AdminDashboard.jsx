@@ -41,6 +41,7 @@ export const AdminDashboard = () => {
 
     const COLORS = ['#10b981', '#f43f5e', '#6366f1']; // Green, Red, Indigo
     const [chartData, setChartData] = useState([]); // Real chart data
+    const [performanceData, setPerformanceData] = useState([]);
 
     const loadData = async () => {
         try {
@@ -72,11 +73,11 @@ export const AdminDashboard = () => {
                 }
             });
 
-            // Calculate Average Score (only from Completed sessions with scores)
-            const completedSessions = sessionsList.filter(s => s.status === 'Completed');
-            const avgScore = completedSessions.length > 0
-                ? Math.round(completedSessions.reduce((acc, curr) => acc + (curr.score || 0), 0) / completedSessions.length)
-                : 0;
+            // Calculate Average Trust Score (from ALL sessions with trust scores)
+            const sessionsWithTrust = sessionsList.filter(s => s.trust_score !== undefined);
+            const avgTrustScore = sessionsWithTrust.length > 0
+                ? Math.round(sessionsWithTrust.reduce((acc, curr) => acc + (Number(curr.trust_score) || 0), 0) / sessionsWithTrust.length)
+                : 100;
 
             const totalExams = sessionsList.length;
 
@@ -86,7 +87,7 @@ export const AdminDashboard = () => {
                 flagged: flaggedCount,
                 completed: completedCount,
                 total_students: totalStudents,
-                avg_score: avgScore,
+                avg_score: avgTrustScore, // Fix: Use Trust Score for the card
                 total_exams: totalExams
             });
 
@@ -127,6 +128,32 @@ export const AdminDashboard = () => {
 
             setChartData(last7Days);
 
+            // --- Process Subject Performance ---
+            const performanceMap = {};
+            sessionsList.forEach(s => {
+                // Include sessions if they have a percentage (or score)
+                // Prefer 'percentage' if available (added to backend), else use 'score' (which might be raw)
+                const valToUse = s.percentage !== undefined ? s.percentage : s.score;
+
+                if ((s.status === 'Completed' || s.status === 'Flagged' || s.status === 'Terminated') && valToUse !== undefined && valToUse !== null) {
+                    const scoreVal = Number(valToUse);
+                    if (!isNaN(scoreVal)) {
+                        const subject = s.exam_type || 'Unknown';
+                        if (!performanceMap[subject]) {
+                            performanceMap[subject] = { name: subject, totalScore: 0, count: 0 };
+                        }
+                        performanceMap[subject].totalScore += scoreVal;
+                        performanceMap[subject].count += 1;
+                    }
+                }
+            });
+
+            const performanceData = Object.values(performanceMap).map(item => ({
+                name: item.name,
+                avgScore: Math.round(item.totalScore / item.count)
+            }));
+            setPerformanceData(performanceData);
+
         } catch (err) {
             console.error("Error loading dashboard data:", err);
             toast.error("Failed to load dashboard data");
@@ -164,6 +191,37 @@ export const AdminDashboard = () => {
         { name: 'Flagged', value: stats.flagged },
         { name: 'Completed', value: stats.completed || 0 }
     ];
+
+    const exportCSV = () => {
+        if (!sessions.length) return;
+
+        const headers = ["Session ID", "Candidate", "Exam Type", "Status", "Score", "Trust Score", "Latest Alert", "Date"];
+        const csvRows = [headers.join(",")];
+
+        sessions.forEach(s => {
+            const row = [
+                s.id,
+                `"${s.student_name || s.studentName || 'Unknown'}"`,
+                `"${s.exam_type || ''}"`,
+                s.status,
+                s.score || 0,
+                s.trust_score || 100,
+                `"${s.latest_log || ''}"`,
+                s.created_at || ''
+            ];
+            csvRows.push(row.join(","));
+        });
+
+        const blob = new Blob([csvRows.join("\n")], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `exam_report_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    };
 
     return (
         <div className="container" style={{ paddingBottom: '3rem' }}>
@@ -219,7 +277,7 @@ export const AdminDashboard = () => {
             </div>
 
             {/* Charts Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
                 {/* Activity Chart */}
                 <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '350px' }}>
                     <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Weekly Exam Activity</h3>
@@ -238,31 +296,103 @@ export const AdminDashboard = () => {
                     </ResponsiveContainer>
                 </div>
 
-                {/* Status Pie Chart */}
+                {/* Subject Performance Chart */}
                 <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '350px' }}>
-                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Exam Status Distribution</h3>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                            <Pie
-                                data={statusData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {statusData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                                ))}
-                            </Pie>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Subject Performance (Avg Score)</h3>
+                    <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={performanceData} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                            <XAxis type="number" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                            <YAxis dataKey="name" type="category" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} width={100} />
                             <Tooltip
+                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                 contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff' }}
                                 itemStyle={{ color: '#fff' }}
                             />
-                            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#fff' }} />
-                        </PieChart>
+                            <Bar dataKey="avgScore" name="Average Score" fill="var(--accent-success)" radius={[0, 4, 4, 0]} barSize={20} />
+                        </BarChart>
                     </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Status Distribution (Full Width) */}
+            <div style={{ marginBottom: '2.5rem' }}>
+                <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '300px' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Overall Status Distribution</h3>
+                    <div style={{ height: '250px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={statusData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {statusData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff' }}
+                                    itemStyle={{ color: '#fff' }}
+                                />
+                                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#fff' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            {/* Suspicious Activity Feed */}
+            <div style={{ marginBottom: '2.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-alert)' }}>
+                    <ShieldAlert size={20} /> Suspicious Activity & At-Risk Sessions
+                </h3>
+                <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+                    {sessions.filter(s => (s.trust_score !== undefined && s.trust_score < 70) || s.status === 'Flagged' || s.status === 'Terminated' || !!s.latest_log).length > 0 ? (
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                            {sessions
+                                .filter(s => (s.trust_score !== undefined && s.trust_score < 70) || s.status === 'Flagged' || s.status === 'Terminated' || !!s.latest_log)
+                                .map(session => (
+                                    <div key={session.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(244, 63, 94, 0.1)', color: 'var(--accent-alert)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <ShieldAlert size={16} />
+                                            </div>
+                                            <div>
+                                                <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{session.student_name || 'Unknown Student'}</p>
+                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ID: {session.id.substring(0, 8)}...</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <span style={{
+                                                display: 'inline-block',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                background: 'rgba(244, 63, 94, 0.1)',
+                                                color: 'var(--accent-alert)',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold',
+                                                marginBottom: '0.25rem'
+                                            }}>
+                                                Trust Score: {session.trust_score !== undefined ? session.trust_score : 100}%
+                                            </span>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                {session.latest_log || (session.status === 'Terminated' ? 'Exam Terminated' : 'Flagged by System')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    ) : (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <CheckCircle size={32} style={{ color: 'var(--accent-success)', marginBottom: '0.5rem', opacity: 0.5 }} />
+                            <p>No suspicious activity detected.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -270,7 +400,12 @@ export const AdminDashboard = () => {
             <div className="glass-panel" style={{ padding: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h3 style={{ fontSize: '1.1rem' }}>Recent Sessions</h3>
-                    <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem' }}>View All</button>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button onClick={exportCSV} className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileText size={16} /> Export CSV
+                        </button>
+                        <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem' }}>View All</button>
+                    </div>
                 </div>
 
                 {sessions.length === 0 ? (
@@ -389,7 +524,15 @@ export const AdminDashboard = () => {
 };
 
 const StatCard = ({ label, value, icon: Icon, color, bg }) => (
-    <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', border: '1px solid var(--glass-border)' }}>
+    <div className="glass-card" style={{
+        padding: '1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1rem',
+        border: '1px solid var(--glass-border)',
+        borderRadius: '12px',
+        background: 'var(--bg-secondary)'
+    }}>
         <div style={{
             width: '48px', height: '48px',
             borderRadius: '12px',

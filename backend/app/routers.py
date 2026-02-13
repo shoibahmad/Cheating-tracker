@@ -42,6 +42,8 @@ def get_session_history():
                 "status": data.get('status'),
                 "trust_score": data.get('trust_score'),
                 "score": data.get('score', 0),
+                "percentage": data.get('percentage', 0),
+                "total": data.get('total', 0),
                 "latest_log": data.get('latest_log'),
                 "created_at": data.get('created_at', "")
             })
