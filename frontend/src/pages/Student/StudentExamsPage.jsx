@@ -62,7 +62,7 @@ export const StudentExamsPage = () => {
                             borderLeft: '4px solid var(--accent-primary)'
                         }}>
                             <div>
-                                <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{exam.examTitle || exam.exam_type}</h3>
+                                <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{exam.exam_title || exam.examTitle || exam.exam_type}</h3>
                                 <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                         <FileText size={16} /> {exam.exam_type}

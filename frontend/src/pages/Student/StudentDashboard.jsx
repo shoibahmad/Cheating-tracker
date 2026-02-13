@@ -96,7 +96,7 @@ export const StudentDashboard = () => {
                                         borderLeft: `4px solid ${exam.status === 'Completed' ? 'var(--accent-success)' : 'var(--accent-primary)'}`
                                     }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>{exam.exam_type}</div>
+                                            <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>{exam.exam_title || exam.examTitle || exam.exam_type}</div>
                                             {exam.status === 'Completed' && (
                                                 <span style={{ fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--accent-success)', padding: '2px 6px', borderRadius: '4px' }}>
                                                     Score: {exam.score}%

@@ -165,7 +165,7 @@ export const StudentReportsPage = () => {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                                 <div>
-                                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{report.examTitle || report.exam_type}</h3>
+                                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{report.exam_title || report.examTitle || report.exam_type || 'Untitled Exam'}</h3>
                                     <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                             <CheckCircle size={16} color="var(--accent-success)" /> Completed

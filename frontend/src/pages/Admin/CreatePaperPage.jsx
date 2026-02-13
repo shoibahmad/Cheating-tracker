@@ -191,8 +191,9 @@ export const CreatePaperPage = () => {
                                                     // Map Gemini questions to our state format
                                                     const formattedQuestions = data.questions.map((q, idx) => ({
                                                         id: `q${Date.now()}_${idx}`,
+                                                        type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'descriptive'),
                                                         text: q.text,
-                                                        options: q.options ? q.options.map(o => o.text || o) : ['', '', '', ''],
+                                                        options: (q.options && q.options.length > 0) ? q.options.map(o => o.text || o) : ['', '', '', ''],
                                                         correct_answer: q.correctAnswer ? (['a', 'b', 'c', 'd'].indexOf(q.correctAnswer.toLowerCase())) : 0
                                                     }));
 

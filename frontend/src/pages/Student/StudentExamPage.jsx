@@ -25,6 +25,7 @@ export const StudentExamPage = () => {
     // Exam State
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState({});
+    const [examTitle, setExamTitle] = useState(""); // Add Title State
     const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes in seconds
 
     // Monitor State
@@ -59,8 +60,12 @@ export const StudentExamPage = () => {
         const fetchExamData = async () => {
             try {
                 const sessionRes = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
+
                 if (!sessionRes.ok) throw new Error("Session not found");
                 const sessionData = await sessionRes.json();
+
+                // Set Title
+                setExamTitle(sessionData.exam_title || sessionData.examTitle || sessionData.exam_type || "Online Examination");
 
                 // Check for completion/termination immediately
                 if (sessionData.status === 'Completed') {
@@ -87,12 +92,14 @@ export const StudentExamPage = () => {
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
+                        if (!sessionData.examTitle) setExamTitle(paperData.title || sessionData.exam_type); // Fallback to paper title
                     }
                 } else if (sessionData.question_paper_id) {
                     const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
+                        if (!sessionData.examTitle) setExamTitle(paperData.title || sessionData.exam_type);
                     }
                 }
 
@@ -309,32 +316,67 @@ export const StudentExamPage = () => {
 
     // MediaPipe Integration
 
+    // MediaPipe Integration
+    const requestRef = useRef(null);
+
     useEffect(() => {
         if (loading || terminated) return;
 
-        const startMonitoring = async () => {
-            if (videoRef.current) {
-                try {
-                    await faceMeshService.initialize(videoRef.current, (analysis) => {
-                        // Check grace period
-                        if (!monitoringActive.current) return;
+        const startCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' },
+                    audio: false
+                });
 
-                        if (analysis.status === 'WARNING') {
-                            // Immediate Termination on Face Warning
-                            handleViolation(`Proctoring Flag: ${analysis.message}`);
-                        } else if (analysis.status === 'NO_FACE') {
-                            handleViolation("Proctoring Flag: No Face Detected");
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    // Wait for video to be ready
+                    videoRef.current.onloadedmetadata = async () => {
+                        try {
+                            await videoRef.current.play();
+
+                            // Initialize AI
+                            await faceMeshService.initialize((analysis) => {
+                                // Check grace period
+                                if (!monitoringActive.current) return;
+
+                                if (analysis.status === 'WARNING') {
+                                    handleViolation(`Proctoring Flag: ${analysis.message}`);
+                                } else if (analysis.status === 'NO_FACE') {
+                                    handleViolation("Proctoring Flag: No Face Detected");
+                                }
+                            });
+
+                            // Start Processing Loop
+                            const processFrame = async () => {
+                                if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
+                                    await faceMeshService.send(videoRef.current);
+                                }
+                                requestRef.current = requestAnimationFrame(processFrame);
+                            };
+                            requestRef.current = requestAnimationFrame(processFrame);
+
+                        } catch (e) {
+                            console.error("Error playing video or init AI", e);
                         }
-                    });
-                } catch (err) {
-                    console.error("FaceMesh Init Error", err);
+                    };
                 }
+            } catch (err) {
+                console.error("Camera Access Error:", err);
+                alert("Camera access is required for this exam. Please allow camera access.");
             }
         };
-        startMonitoring();
+
+        startCamera();
 
         return () => {
-            // faceMeshService.stop(); // Keep running or stop?
+            console.log("Exam Page Unmount: Stopping Camera & FaceMesh");
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            faceMeshService.stop();
+            if (videoRef.current && videoRef.current.srcObject) {
+                videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+            }
         };
     }, [loading, terminated]);
 
@@ -545,7 +587,7 @@ export const StudentExamPage = () => {
                 justifyContent: 'space-between',
                 padding: '0 2rem'
             }}>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>University Online Examination</div>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{examTitle || "University Online Examination"}</div>
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Time Left:</span>

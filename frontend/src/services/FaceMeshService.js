@@ -11,10 +11,14 @@ class FaceMeshService {
         this.isInitialized = false;
     }
 
-    async initialize(videoElement, onResults) {
-        if (this.isInitialized) return;
+    async initialize(onResults) {
+        if (this.isInitialized) {
+            console.log("FaceMeshService: Re-initializing");
+            // If already initialized, just update the callback
+            this.onResultsCallback = onResults;
+            return;
+        }
 
-        this.videoElement = videoElement;
         this.onResultsCallback = onResults;
 
         this.faceMesh = new FaceMesh({
@@ -32,24 +36,21 @@ class FaceMeshService {
 
         this.faceMesh.onResults(this.handleResults.bind(this));
 
-        if (this.videoElement) {
-            this.camera = new Camera(this.videoElement, {
-                onFrame: async () => {
-                    if (this.faceMesh && this.videoElement) {
-                        try {
-                            await this.faceMesh.send({ image: this.videoElement });
-                        } catch (e) {
-                            console.error("FaceMesh send error", e);
-                        }
-                    }
-                },
-                width: 640,
-                height: 480
-            });
-            await this.camera.start();
-        }
+        // Initialize the model (send a dummy/empty frame or wait for first send)
+        await this.faceMesh.initialize();
 
         this.isInitialized = true;
+        console.log("FaceMeshService: Initialized");
+    }
+
+    async send(videoElement) {
+        if (!this.isInitialized || !this.faceMesh) return;
+
+        try {
+            await this.faceMesh.send({ image: videoElement });
+        } catch (e) {
+            // console.error("FaceMesh send error", e); // Suppress frequent errors if frame not ready
+        }
     }
 
     handleResults(results) {

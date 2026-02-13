@@ -35,10 +35,17 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
 
     prompt = """
     Analyze this exam paper document.
-    1. Extract all questions, their options (if multiple choice), marks, and correct answer (if indicated).
-    2. Format the output as a valid JSON object with a 'questions' array.
-    3. Each question object should have: 'id' (number), 'text' (string), 'options' (array of {label, text}), 'correctAnswer' (label string or null if unknown), and 'marks' (number, default to 1).
-    4. Also provide a brief 'insights' string summarizing the difficulty level and topics covered.
+    1. Extract all questions.
+    2. Determine the type of each question: 'mcq' (if it has options like A, B, C, D) or 'descriptive' (if it requires a written answer).
+    3. Format the output as a valid JSON object with a 'questions' array.
+    4. Each question object should have:
+       - 'id' (number)
+       - 'type' (string: 'mcq' or 'descriptive')
+       - 'text' (string)
+       - 'options' (array of {label, text} ONLY if type is mcq, otherwise empty array)
+       - 'correctAnswer' (label string or null if unknown/descriptive)
+       - 'marks' (number, default to 1)
+    5. Also provide a brief 'insights' string summarizing the difficulty level and topics covered.
     
     Return ONLY valid JSON.
     """

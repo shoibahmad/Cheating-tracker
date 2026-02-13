@@ -226,7 +226,7 @@ export const AdminDashboard = () => {
         doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
         doc.text(`Total Sessions: ${sessions.length}`, 14, 38);
 
-        const tableColumn = ["ID", "Student", "Exam", "Status", "Trust Score", "Score"];
+        const tableColumn = ["ID", "Student", "Exam", "Status", "Score", "Percentage", "Trust Score"];
         const tableRows = [];
 
         sessions.forEach(session => {
@@ -235,8 +235,9 @@ export const AdminDashboard = () => {
                 session.student_name || "Unknown",
                 session.exam_type || "N/A",
                 session.status,
-                `${session.trust_score || 0}%`,
-                session.score || 0
+                `${session.score || 0} / ${session.total || '?'}`,
+                `${session.percentage || ((session.score && session.total) ? Math.round((session.score / session.total) * 100) : 0)}%`,
+                `${session.trust_score || 0}%`
             ];
             tableRows.push(sessionData);
         });
@@ -483,6 +484,7 @@ export const AdminDashboard = () => {
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Exam Type</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Status</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
+                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Percentage</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Latest Alert</th>
                                     <th style={{ padding: '1rem', fontWeight: 500 }}>Actions</th>
@@ -521,7 +523,12 @@ export const AdminDashboard = () => {
                                             </span>
                                         </td>
                                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>
-                                            {session.score !== undefined ? `${session.score}%` : 'N/A'}
+                                            {session.score !== undefined ? `${session.score} / ${session.total || '?'}` : 'N/A'}
+                                        </td>
+                                        <td style={{ padding: '1rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
+                                            {session.percentage !== undefined ? `${session.percentage}%` : (
+                                                (session.score && session.total) ? Math.round((session.score / session.total) * 100) + '%' : 'N/A'
+                                            )}
                                         </td>
                                         <td style={{ padding: '1rem' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
