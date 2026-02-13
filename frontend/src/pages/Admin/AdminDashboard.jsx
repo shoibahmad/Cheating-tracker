@@ -39,35 +39,38 @@ export const AdminDashboard = () => {
         total_exams: 0
     });
 
-    // Mock data for charts (since backend history API isn't fully ready for trends)
-    const activityData = [
-        { name: 'Mon', exams: 12, alerts: 2 },
-        { name: 'Tue', exams: 19, alerts: 4 },
-        { name: 'Wed', exams: 15, alerts: 1 },
-        { name: 'Thu', exams: 22, alerts: 5 },
-        { name: 'Fri', exams: 28, alerts: 3 },
-        { name: 'Sat', exams: 8, alerts: 0 },
-        { name: 'Sun', exams: 5, alerts: 1 },
-    ];
-
     const COLORS = ['#10b981', '#f43f5e', '#6366f1']; // Green, Red, Indigo
+    const [chartData, setChartData] = useState([]); // Real chart data
 
     const loadData = async () => {
         try {
-            // Fetch stats from SQLite Backend
+            // Fetch stats from Backend
             const res = await fetch(`${API_BASE_URL}/api/admin/exams/history`);
             if (!res.ok) throw new Error("Failed to fetch sessions");
             const sessionsList = await res.json();
 
-            // Fetch Students (still from Firestore for now, or use backend if migrated)
-            // Keeping Firestore for students as per current hybrid approach
+            // Fetch Students
             const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
             const totalStudents = usersSnapshot.size;
 
-            // Calculate Stats
-            const active = sessionsList.filter(s => s.status === 'Active').length;
-            const flagged = sessionsList.filter(s => s.status === 'Flagged' || s.status === 'Terminated').length; // Terminated counts as flagged/incident
-            const totalExams = sessionsList.length;
+            // --- Process Data for Stats (Prioritized for Distribution) ---
+            let activeCount = 0;
+            let flaggedCount = 0;
+            let completedCount = 0;
+
+            sessionsList.forEach(s => {
+                // Robust check: Status is Terminated/Flagged OR latest_log exists (and is not just whitespace)
+                const hasLog = s.latest_log && String(s.latest_log).trim().length > 0;
+                const isFlagged = s.status === 'Terminated' || s.status === 'Flagged' || hasLog;
+
+                if (isFlagged) {
+                    flaggedCount++;
+                } else if (s.status === 'Completed') {
+                    completedCount++;
+                } else if (s.status === 'Active') {
+                    activeCount++;
+                }
+            });
 
             // Calculate Average Score (only from Completed sessions with scores)
             const completedSessions = sessionsList.filter(s => s.status === 'Completed');
@@ -75,14 +78,55 @@ export const AdminDashboard = () => {
                 ? Math.round(completedSessions.reduce((acc, curr) => acc + (curr.score || 0), 0) / completedSessions.length)
                 : 0;
 
-            setSessions(sessionsList); // For the table
+            const totalExams = sessionsList.length;
+
+            setSessions(sessionsList);
             setStats({
-                active,
-                flagged,
+                active: activeCount,
+                flagged: flaggedCount,
+                completed: completedCount,
                 total_students: totalStudents,
                 avg_score: avgScore,
                 total_exams: totalExams
             });
+
+            // --- Process Data for Weekly Activity Chart ---
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const today = new Date();
+            const last7Days = [];
+
+            // Initialize last 7 days buckets
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const dayName = days[d.getDay()];
+                // We'll use local date string for robust comparison 'YYYY-MM-DD'
+                const dateKey = d.toISOString().split('T')[0];
+                last7Days.push({
+                    name: dayName,
+                    dateKey: dateKey,
+                    exams: 0,
+                    alerts: 0
+                });
+            }
+
+            // Fill buckets
+            sessionsList.forEach(session => {
+                if (!session.created_at) return;
+                // session.created_at is ISO string
+                const sessionDate = session.created_at.split('T')[0];
+
+                const dayBucket = last7Days.find(d => d.dateKey === sessionDate);
+                if (dayBucket) {
+                    dayBucket.exams += 1;
+                    if (session.status === 'Flagged' || session.status === 'Terminated' || session.latest_log) {
+                        dayBucket.alerts += 1;
+                    }
+                }
+            });
+
+            setChartData(last7Days);
+
         } catch (err) {
             console.error("Error loading dashboard data:", err);
             toast.error("Failed to load dashboard data");
@@ -91,6 +135,8 @@ export const AdminDashboard = () => {
 
     useEffect(() => {
         loadData();
+        const interval = setInterval(loadData, 10000); // Refresh every 10 seconds
+        return () => clearInterval(interval);
     }, []);
 
     const handleDelete = async (sessionId) => {
@@ -116,7 +162,7 @@ export const AdminDashboard = () => {
     const statusData = [
         { name: 'Active', value: stats.active },
         { name: 'Flagged', value: stats.flagged },
-        { name: 'Completed', value: stats.total_exams - stats.active - stats.flagged } // Derived
+        { name: 'Completed', value: stats.completed || 0 }
     ];
 
     return (
@@ -178,10 +224,10 @@ export const AdminDashboard = () => {
                 <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '350px' }}>
                     <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Weekly Exam Activity</h3>
                     <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={activityData}>
+                        <BarChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                            <XAxis dataKey="name" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
-                            <YAxis stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                            <XAxis dataKey="name" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} />
+                            <YAxis stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} />
                             <Tooltip
                                 contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
                                 itemStyle={{ color: 'var(--text-primary)' }}
@@ -211,9 +257,10 @@ export const AdminDashboard = () => {
                                 ))}
                             </Pie>
                             <Tooltip
-                                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
+                                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff' }}
+                                itemStyle={{ color: '#fff' }}
                             />
-                            <Legend verticalAlign="bottom" height={36} />
+                            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#fff' }} />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
@@ -287,7 +334,9 @@ export const AdminDashboard = () => {
                                                         width: `${session.trust_score !== undefined ? session.trust_score : 100}%`,
                                                         height: '100%',
                                                         borderRadius: '3px',
-                                                        background: (session.trust_score !== undefined ? session.trust_score : 100) > 80 ? 'var(--accent-success)' : (session.trust_score || 100) > 50 ? 'var(--accent-warning)' : 'var(--accent-alert)'
+                                                        background: (session.latest_log || session.status === 'Flagged' || session.status === 'Terminated')
+                                                            ? 'var(--accent-alert)'
+                                                            : (session.trust_score !== undefined ? session.trust_score : 100) > 80 ? 'var(--accent-success)' : (session.trust_score || 100) > 50 ? 'var(--accent-warning)' : 'var(--accent-alert)'
                                                     }} />
                                                 </div>
                                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{session.trust_score !== undefined ? session.trust_score : 100}%</span>

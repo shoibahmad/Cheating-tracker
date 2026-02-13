@@ -523,25 +523,22 @@ def submit_exam(session_id: str, submission: SubmitExamRequest):
         if data.get('status') == 'Completed':
              return {"message": "Already submitted"}
 
-        # Calculate Score
-        score = 0
-        total = 0
-        percentage = 0
-        
+        # Fetch questions for grading
+        questions = []
         exam_id = data.get('exam_id')
         if exam_id:
             paper_ref = db.collection('exams').document(exam_id)
             paper_doc = paper_ref.get()
             if paper_doc.exists:
                 questions = paper_doc.to_dict().get('questions', [])
-                total = len(questions)
-                for i, q in enumerate(questions):
-                    q_id = str(q.get('id', i))
-                    user_answer = submission.answers.get(str(q_id))
-                    correct_answer = q.get('correct_answer')
-                    if user_answer is not None and str(user_answer) == str(correct_answer):
-                        score += 1
-
+                
+        # Use AI Service for Evaluation
+        from backend.app.ai_service import evaluate_exam_submission
+        
+        evaluation = evaluate_exam_submission(questions, submission.answers)
+        
+        score = evaluation['score']
+        total = evaluation['total_questions']
         percentage = (score / total * 100) if total > 0 else 0
 
         # Update Firestore
@@ -549,14 +546,17 @@ def submit_exam(session_id: str, submission: SubmitExamRequest):
             "status": "Completed",
             "score": score,
             "total": total,
-            "percentage": round(percentage, 2)
+            "percentage": round(percentage, 2),
+            "answers": submission.answers,
+            "feedback": evaluation['feedback'] # Store detailed feedback
         })
 
         return {
             "message": "Exam submitted successfully",
             "score": score,
             "total": total,
-            "percentage": round(percentage, 2)
+            "percentage": round(percentage, 2),
+            "feedback": evaluation['feedback']
         }
 
     except Exception as e:
@@ -604,6 +604,70 @@ def delete_session(session_id: str):
         return {"message": "Session deleted successfully"}
     except Exception as e:
         print(f"Error deleting session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sessions/{session_id}/generate-report", tags=["Exam Session"])
+def generate_session_report(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        session_doc = session_ref.get()
+        
+        if not session_doc.exists:
+             raise HTTPException(status_code=404, detail="Session not found")
+        
+        data = session_doc.to_dict()
+        
+        # Fetch detailed logs
+        logs_ref = session_ref.collection("logs").order_by("timestamp")
+        logs = [d.to_dict() for d in logs_ref.stream()]
+        
+        # Generate AI Report
+        from backend.app.ai_service import generate_exam_report
+        
+        report = generate_exam_report(logs, data.get('score', 0), data.get('total', 0))
+        
+        # Save Report
+        session_ref.update({
+            "ai_report": report
+        })
+        
+        return report
+    except Exception as e:
+        print(f"Error generating report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class LogRequest(BaseModel):
+    message: str
+    timestamp: str
+
+@router.post("/sessions/{session_id}/log", tags=["Exam Session"])
+def log_violation(session_id: str, log: LogRequest):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        
+        # Add to subcollection
+        session_ref.collection("logs").add({
+            "message": log.message,
+            "timestamp": log.timestamp
+        })
+        
+        # Update latest log on main doc for quick access
+        session_ref.update({
+            "latest_log": log.message,
+            # Decrease trust score logic could go here too
+        })
+        
+        return {"status": "Logged"}
+    except Exception as e:
+        print(f"Error logging violation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

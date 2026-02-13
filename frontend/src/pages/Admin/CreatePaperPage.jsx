@@ -24,12 +24,12 @@ export const CreatePaperPage = () => {
     const [title, setTitle] = useState('');
     const [subject, setSubject] = useState('');
     const [questions, setQuestions] = useState([
-        { id: 'q1', text: '', options: ['', '', '', ''], correct_answer: 0 }
+        { id: 'q1', type: 'mcq', text: '', options: ['', '', '', ''], correct_answer: 0 }
     ]);
 
     const addQuestion = () => {
         const newId = `q${questions.length + 1}`;
-        setQuestions([...questions, { id: newId, text: '', options: ['', '', '', ''], correct_answer: 0 }]);
+        setQuestions([...questions, { id: newId, type: 'mcq', text: '', options: ['', '', '', ''], correct_answer: 0 }]);
     };
 
     const removeQuestion = (index) => {
@@ -69,9 +69,10 @@ export const CreatePaperPage = () => {
                 title,
                 subject,
                 questions: questions.map(q => ({
+                    type: q.type || 'mcq',
                     text: q.text,
-                    options: q.options,
-                    correct_answer: q.correct_answer
+                    options: q.type === 'mcq' ? q.options : [],
+                    correct_answer: q.type === 'mcq' ? q.correct_answer : null
                 })),
                 createdAt: serverTimestamp(),
                 createdBy: currentUser ? currentUser.uid : 'admin',
@@ -285,6 +286,19 @@ export const CreatePaperPage = () => {
                                     </button>
                                 </div>
 
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginRight: '10px' }}>Question Type:</label>
+                                    <select
+                                        value={q.type || 'mcq'}
+                                        onChange={(e) => updateQuestion(qIndex, 'type', e.target.value)}
+                                        className="glass-input"
+                                        style={{ width: 'auto', padding: '5px 10px', display: 'inline-block' }}
+                                    >
+                                        <option value="mcq">Multiple Choice</option>
+                                        <option value="descriptive">Descriptive (Text)</option>
+                                    </select>
+                                </div>
+
                                 <div style={{ marginBottom: '1.5rem' }}>
                                     <input
                                         type="text"
@@ -297,43 +311,47 @@ export const CreatePaperPage = () => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
-                                    {q.options.map((opt, oIndex) => (
-                                        <div key={oIndex} style={{ position: 'relative' }}>
-                                            <input
-                                                type="text"
-                                                value={opt}
-                                                onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                                                className="glass-input"
-                                                placeholder={`Option ${oIndex + 1}`}
-                                                required
-                                                style={{
-                                                    paddingRight: '40px',
-                                                    borderColor: q.correct_answer === oIndex ? 'var(--accent-success)' : 'var(--glass-border)'
-                                                }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => updateQuestion(qIndex, 'correct_answer', oIndex)}
-                                                style={{
-                                                    position: 'absolute',
-                                                    right: '10px',
-                                                    top: '50%',
-                                                    transform: 'translateY(-50%)',
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    color: q.correct_answer === oIndex ? 'var(--accent-success)' : 'var(--text-secondary)',
-                                                    display: 'flex',
-                                                    alignItems: 'center'
-                                                }}
-                                                title="Mark as Correct Answer"
-                                            >
-                                                {q.correct_answer === oIndex ? <CheckCircle size={18} fill="rgba(16, 185, 129, 0.2)" /> : <Circle size={18} />}
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
+
+
+                                {(!q.type || q.type === 'mcq') && (
+                                    <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
+                                        {q.options.map((opt, oIndex) => (
+                                            <div key={oIndex} style={{ position: 'relative' }}>
+                                                <input
+                                                    type="text"
+                                                    value={opt}
+                                                    onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                                                    className="glass-input"
+                                                    placeholder={`Option ${oIndex + 1}`}
+                                                    required
+                                                    style={{
+                                                        paddingRight: '40px',
+                                                        borderColor: q.correct_answer === oIndex ? 'var(--accent-success)' : 'var(--glass-border)'
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateQuestion(qIndex, 'correct_answer', oIndex)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '10px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        color: q.correct_answer === oIndex ? 'var(--accent-success)' : 'var(--text-secondary)',
+                                                        display: 'flex',
+                                                        alignItems: 'center'
+                                                    }}
+                                                    title="Mark as Correct Answer"
+                                                >
+                                                    {q.correct_answer === oIndex ? <CheckCircle size={18} fill="rgba(16, 185, 129, 0.2)" /> : <Circle size={18} />}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -360,7 +378,7 @@ export const CreatePaperPage = () => {
                         <Save size={20} /> Save Question Paper
                     </button>
                 </div>
-            </form>
-        </div>
+            </form >
+        </div >
     );
 };

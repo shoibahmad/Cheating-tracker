@@ -5,14 +5,22 @@ import { AlertTriangle, Clock, CheckCircle, Smartphone } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 
 import { db } from '../../firebase';
+import { faceMeshService } from '../../services/FaceMeshService';
 
 export const StudentExamPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const videoRef = useRef(null);
+    const violationProcessed = useRef(false);
+    const monitoringActive = useRef(false); // Grace period control
     const [loading, setLoading] = useState(true);
     const [terminated, setTerminated] = useState(false);
+    const [showSubmitModal, setShowSubmitModal] = useState(false); // Custom Confirm Modal
+
     const [terminationReason, setTerminationReason] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [result, setResult] = useState(null);
+    const [violationReason, setViolationReason] = useState(null); // New state for result display
 
     // Exam State
     const [questions, setQuestions] = useState([]);
@@ -92,110 +100,58 @@ export const StudentExamPage = () => {
                 if (sessionData.answers) {
                     setAnswers(sessionData.answers);
                 }
+
+                // Ensure loading is stopped
+                setLoading(false);
             } catch (err) {
                 console.error("Error loading exam:", err);
+                setLoading(false); // Enable error UI or fallback
             }
         };
         fetchExamData();
     }, [id]);
 
-    // --- 2. Camera & Monitoring ---
-    useEffect(() => {
-        let intervalId;
-        const startCamera = async () => {
-            try {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                        setLoading(false);
-                        intervalId = setInterval(captureAndAnalyze, 1000);
-                    }
-                }
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                alert("Camera access is required. Please allow access and refresh.");
-                setLoading(false);
-            }
-        };
-        startCamera();
+    // --- 2. Browser Security & MediaPipe Monitoring ---
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [tabSwitches, setTabSwitches] = useState(0);
 
-        return () => {
-            if (videoRef.current && videoRef.current.srcObject) {
-                videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-            }
-            if (intervalId) clearInterval(intervalId);
-        };
-    }, [terminated]);
+    // Browser Security Listeners
 
-    const captureAndAnalyze = async () => {
-        if (!videoRef.current || terminated) return;
-
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-            const imageBase64 = canvas.toDataURL('image/jpeg', 0.5);
-
-            const res = await fetch(`${API_BASE_URL}/api/analyze_frame`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: id, image: imageBase64 })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.status === 'Terminated') {
-                    setTerminated(true);
-                    setTerminationReason(data.reason);
-                }
-            }
-        } catch (e) {
-            console.error("Monitor error", e);
-        }
-    };
-
-
-
-    // --- 4. Timer Logic (30 mins) ---
-    const [submitting, setSubmitting] = useState(false);
-    const [result, setResult] = useState(null);
-
-    useEffect(() => {
-        if (loading || result || terminated) return;
-
-        const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmit(); // Auto-submit
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [loading, result, terminated]);
-
-    const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    // --- 5. Submission ---
+    // --- 4. Submission (Moved Up) ---
     const handleAnswerChange = (qId, optionIndex) => {
         setAnswers(prev => ({ ...prev, [qId]: optionIndex }));
     };
 
-    const handleSubmit = async (e) => {
-        if (e) e.preventDefault();
+    const toggleMarkForReview = (qId) => {
+        setMarkedForReview(prev => ({
+            ...prev,
+            [qId]: !prev[qId]
+        }));
+    };
+
+    const clearResponse = (qId) => {
+        setAnswers(prev => {
+            const newAnswers = { ...prev };
+            delete newAnswers[qId];
+            return newAnswers;
+        });
+    };
+
+    const confirmSubmit = () => {
+        executeSubmit(false);
+    };
+
+    const executeSubmit = async (isForced = false, reason = "") => {
+        // 1. Disable Monitoring IMMEDIATELY to prevent "Exit Fullscreen" violation during teardown
+        monitoringActive.current = false;
+        setShowSubmitModal(false);
+
         setSubmitting(true);
 
-        // Artificial delay for UX
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Artificial delay for UX only if normal submit
+        if (!isForced) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
 
         try {
             const res = await fetch(`${API_BASE_URL}/api/sessions/${id}/submit`, {
@@ -210,18 +166,234 @@ export const StudentExamPage = () => {
             if (res.ok) {
                 const data = await res.json();
                 setResult(data);
+                if (isForced) {
+                    setViolationReason(reason);
+                }
             } else {
-                alert("Submission failed. Please try again.");
+                if (!isForced) addWarning("Submission failed. Please try again.");
             }
         } catch (err) {
-            alert("Error connecting to server.");
+            if (!isForced) addWarning("Error connecting to server.");
         } finally {
             setSubmitting(false);
         }
     };
 
+    const handleSubmit = (e) => {
+        if (e) e.preventDefault();
+        setShowSubmitModal(true);
+    };
+
+    const reportViolation = async (reason) => {
+        try {
+            await fetch(`${API_BASE_URL}/api/sessions/${id}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: reason, timestamp: new Date().toISOString() })
+            });
+        } catch (e) {
+            console.error("Failed to report violation", e);
+        }
+    };
+
+    const handleViolation = (reason) => {
+        // Prevent multiple triggerings using Ref (safe against stale closures)
+        if (violationProcessed.current) return;
+
+        // Wait! Check if monitoring is active
+        if (!monitoringActive.current) return;
+
+        violationProcessed.current = true;
+
+        // Check if we already have a violation reason to avoid overwriting the first one
+        setViolationReason(prev => prev || reason);
+
+        reportViolation(reason);
+        reportViolation(reason);
+        executeSubmit(true, reason); // Force submit
+    };
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!monitoringActive.current) return;
+            if (document.hidden) {
+                setTabSwitches(prev => prev + 1);
+                handleViolation("Tab Switching detected");
+            }
+        };
+
+        const handleFullscreenChange = () => {
+            // If we are NOT monitoring yet, don't punish for fullscreen changes
+            // (This happens during setup)
+            if (!monitoringActive.current) return;
+
+            if (!document.fullscreenElement) {
+                setIsFullscreen(false);
+                handleViolation("Exited Fullscreen Mode");
+            }
+        };
+
+        // ... (Keep copy/paste preventions as warnings, as they are blocked actions, not necessarily state violations)
+        const preventCopy = (e) => {
+            e.preventDefault();
+            addWarning("Action Prohibited: Copying content is not allowed.");
+        };
+
+        const preventPaste = (e) => {
+            e.preventDefault();
+            addWarning("Action Prohibited: Pasting content is not allowed.");
+        };
+
+        const preventContextMenu = (e) => {
+            e.preventDefault();
+            addWarning("Action Prohibited: Right-click menu is disabled.");
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
+        document.addEventListener("copy", preventCopy);
+        document.addEventListener("paste", preventPaste);
+        document.addEventListener("contextmenu", preventContextMenu);
+
+        // Force Fullscreen on Mount (or require user action)
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            document.removeEventListener("fullscreenchange", handleFullscreenChange);
+            document.removeEventListener("copy", preventCopy);
+            document.removeEventListener("paste", preventPaste);
+            document.removeEventListener("contextmenu", preventContextMenu);
+        };
+    }, []);
+
+
+    // MediaPipe Integration
+
+    useEffect(() => {
+        if (loading || terminated) return;
+
+        const startMonitoring = async () => {
+            if (videoRef.current) {
+                try {
+                    await faceMeshService.initialize(videoRef.current, (analysis) => {
+                        // Check grace period
+                        if (!monitoringActive.current) return;
+
+                        if (analysis.status === 'WARNING') {
+                            // Immediate Termination on Face Warning
+                            handleViolation(`Proctoring Flag: ${analysis.message}`);
+                        } else if (analysis.status === 'NO_FACE') {
+                            handleViolation("Proctoring Flag: No Face Detected");
+                        }
+                    });
+                } catch (err) {
+                    console.error("FaceMesh Init Error", err);
+                }
+            }
+        };
+        startMonitoring();
+
+        return () => {
+            // faceMeshService.stop(); // Keep running or stop?
+        };
+    }, [loading, terminated]);
+
+    const enterFullscreen = () => {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().then(() => {
+                setIsFullscreen(true);
+                // Enable monitoring after a short grace period (3 seconds)
+                // to allow the browser to settle and user to get ready
+                setTimeout(() => {
+                    monitoringActive.current = true;
+                    addWarning("Exam Started. Monitoring Active.");
+                }, 3000);
+            }).catch(err => {
+                alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        }
+    };
+
+
+
+
+
+    // --- 3. Timer Logic (30 mins) ---
+    useEffect(() => {
+        if (loading || result || terminated) return;
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    clearInterval(timer);
+                    executeSubmit(true, "Time Expired"); // Auto-submit
+                    return 0;
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [loading, result, terminated]);
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // --- Navigation & Status State ---
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [markedForReview, setMarkedForReview] = useState({});
+    const [visited, setVisited] = useState({});
+
+    // Update visited status when question changes
+    useEffect(() => {
+        if (!loading && !result && !terminated && questions.length > 0) {
+            setVisited(prev => ({ ...prev, [currentQuestionIndex]: true }));
+        }
+    }, [currentQuestionIndex, loading, result, terminated, questions]);
+
+
+
+    // --- Helper for Question Status Color ---
+    const getQuestionStatusColor = (q, index) => {
+        const qId = q.id || index;
+        const isAnswered = answers[qId] !== undefined && answers[qId] !== '';
+        const isMarked = markedForReview[qId];
+        const isCurrent = currentQuestionIndex === index;
+
+        if (isCurrent) return 'var(--accent-primary)'; // Blue/Purple for current
+        if (isMarked) return 'var(--accent-warning)'; // Yellow for review
+        if (isAnswered) return 'var(--accent-success)'; // Green for answered
+        return 'rgba(255, 255, 255, 0.1)'; // Default gray/glass for not visited/answered
+    };
+
     // --- Renders ---
 
+    // 1. Fullscreen / Security Check
+    if (!isFullscreen && !terminated && !result && !loading) {
+        return (
+            <div className="animate-fade-in" style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                backgroundColor: 'var(--bg-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
+            }}>
+                <div className="glass-panel" style={{ padding: '3rem', maxWidth: '500px', textAlign: 'center' }}>
+                    <h2 style={{ marginBottom: '1rem' }}>Secure Exam Environment</h2>
+                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
+                        To proceed, you must enter fullscreen mode. <br />
+                        <b>Note:</b> Exiting fullscreen, switching tabs, or looking away will be flagged as violations.
+                    </p>
+                    <button className="btn btn-primary" onClick={enterFullscreen} style={{ padding: '1rem 2rem' }}>
+                        Enter Fullscreen & Start Exam
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // 2. Terminated State
     if (terminated) {
         return (
             <div className="animate-fade-in" style={{
@@ -243,6 +415,7 @@ export const StudentExamPage = () => {
         );
     }
 
+    // 2. Result State
     if (result) {
         return (
             <div className="animate-fade-in" style={{
@@ -250,20 +423,345 @@ export const StudentExamPage = () => {
                 backgroundColor: 'var(--bg-primary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
-                <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem', maxWidth: '400px' }}>
-                    <CheckCircle size={64} style={{ color: 'var(--accent-success)', margin: '0 auto 1.5rem' }} />
+                <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
+                    {violationReason ? (
+                        <div style={{ marginBottom: '2rem', border: '1px solid var(--accent-alert)', padding: '1rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }}>
+                            <AlertTriangle size={48} style={{ color: 'var(--accent-alert)', margin: '0 auto 1rem' }} />
+                            <h2 style={{ color: 'var(--accent-alert)', marginBottom: '0.5rem' }}>Exam Terminated</h2>
+                            <p>Violation: <b>{violationReason}</b></p>
+                        </div>
+                    ) : (
+                        <CheckCircle size={64} style={{ color: 'var(--accent-success)', margin: '0 auto 1.5rem' }} />
+                    )}
+
                     <h2 style={{ marginBottom: '1rem' }}>Exam Completed</h2>
-                    <p style={{ marginBottom: '2rem' }}>Score: {result.score} / {result.total} ({result.percentage}%)</p>
+                    <p style={{ marginBottom: '2rem', fontSize: '1.2rem' }}>Score: <b>{result.score} / {result.total}</b> ({result.percentage}%)</p>
+
+                    {/* Basic AI Feedback Summary if available, full report button recommended */}
+                    <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem' }}>
+                        <p style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '0.5rem' }}>Detailed analysis and AI insights are available in your reports.</p>
+                        <button className="btn btn-secondary" onClick={() => navigate('/student/reports')} style={{ width: '100%', fontSize: '0.9rem' }}>View Detailed Report</button>
+                    </div>
+
                     <button className="btn btn-primary" onClick={() => navigate('/student')} style={{ width: '100%', padding: '1rem' }}>Return to Dashboard</button>
                 </div>
             </div>
         );
     }
 
-    return (
-        <div className="animate-fade-in" style={{ display: 'flex', gap: '2rem', height: 'calc(100vh - 120px)', position: 'relative' }}>
+    // 3. Pre-Exam / Security Check State
+    if (!isFullscreen && !terminated && !loading) {
+        return (
+            <div className="animate-fade-in" style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                backgroundColor: 'var(--bg-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
+            }}>
+                <div className="glass-panel" style={{ padding: '3rem', maxWidth: '500px', textAlign: 'center' }}>
+                    <h2 style={{ marginBottom: '1rem' }}>Secure Exam Environment</h2>
+                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
+                        To proceed, you must enter fullscreen mode. <br />
+                        <b>Note:</b> Exiting fullscreen, switching tabs, or looking away will be flagged as violations.
+                    </p>
+                    <button className="btn btn-primary" onClick={enterFullscreen} style={{ padding: '1rem 2rem' }}>
+                        Enter Fullscreen & Start Exam
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
-            {/* Loading / Submitting Overlay */}
+    // 4. Loading State
+    if (loading) {
+        return (
+            <div style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                backgroundColor: 'var(--bg-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+                <LoadingScreen />
+            </div>
+        );
+    }
+
+    // 5. Main Exam UI (TCS iON Style)
+    const currentQ = questions[currentQuestionIndex];
+    if (!currentQ) return <div>Loading Question...</div>;
+
+    const qId = currentQ.id || currentQuestionIndex;
+
+    return (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+
+            {/* Top Header */}
+            <div style={{
+                height: '60px',
+                background: 'rgba(0,0,0,0.3)',
+                borderBottom: '1px solid var(--glass-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 2rem'
+            }}>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>University Online Examination</div>
+                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Time Left:</span>
+                        <span style={{
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            color: timeLeft < 300 ? 'var(--accent-alert)' : 'white',
+                            background: 'rgba(255,255,255,0.1)',
+                            padding: '4px 12px',
+                            borderRadius: '4px'
+                        }}>
+                            {formatTime(timeLeft)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Sub-Header / Guidelines Banner */}
+            <div style={{
+                background: 'var(--accent-primary)',
+                color: 'white',
+                padding: '0.5rem 2rem',
+                fontSize: '0.85rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}>
+                <span>Ensure your face is visible at all times. Do not switch tabs.</span>
+                <span style={{ opacity: 0.8 }}>Session ID: {id}</span>
+            </div>
+
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+                {/* Left: Question Area */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '2rem', overflowY: 'auto' }}>
+
+                    {/* Question Header */}
+                    <div style={{
+                        marginBottom: '1.5rem',
+                        borderBottom: '1px solid var(--glass-border)',
+                        paddingBottom: '1rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        <h3 style={{ margin: 0 }}>Question {currentQuestionIndex + 1}</h3>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <span style={{ fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
+                                +1.0 Marks
+                            </span>
+                            <span style={{ fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '4px 8px', borderRadius: '4px', color: '#ffaaaa' }}>
+                                -0.0 Neg
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Question Text */}
+                    <div style={{ fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2rem', flex: 1 }}>
+                        {currentQ.text}
+                    </div>
+
+                    {/* Options / Input */}
+                    <div style={{ marginBottom: '2rem' }}>
+                        {currentQ.type === 'descriptive' ? (
+                            <textarea
+                                value={answers[qId] || ''}
+                                onChange={(e) => handleAnswerChange(qId, e.target.value)}
+                                className="glass-input"
+                                rows={8}
+                                placeholder="Type your answer here..."
+                                style={{
+                                    width: '100%',
+                                    resize: 'vertical',
+                                    background: 'rgba(255,255,255,0.03)',
+                                    padding: '1rem',
+                                    lineHeight: '1.6'
+                                }}
+                            />
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {currentQ.options?.map((opt, optIdx) => (
+                                    <label key={optIdx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '16px',
+                                        cursor: 'pointer',
+                                        padding: '1rem',
+                                        borderRadius: '8px',
+                                        background: answers[qId] === optIdx ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
+                                        border: answers[qId] === optIdx ? '1px solid var(--accent-success)' : '1px solid rgba(255,255,255,0.1)',
+                                        transition: 'all 0.2s ease',
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name={`q_${qId}`}
+                                            onChange={() => handleAnswerChange(qId, optIdx)}
+                                            checked={answers[qId] === optIdx}
+                                            style={{ accentColor: 'var(--accent-primary)', width: '18px', height: '18px' }}
+                                        />
+                                        <span style={{ fontSize: '1rem' }}>{opt}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer Buttons */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)' }}>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => clearResponse(qId)}
+                                disabled={answers[qId] === undefined}
+                            >
+                                Clear Response
+                            </button>
+                            <button
+                                className="btn"
+                                style={{
+                                    background: markedForReview[qId] ? 'var(--accent-warning)' : 'rgba(255,255,255,0.1)',
+                                    color: markedForReview[qId] ? 'black' : 'white'
+                                }}
+                                onClick={() => toggleMarkForReview(qId)}
+                            >
+                                {markedForReview[qId] ? 'Unmark Review' : 'Mark for Review'}
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                                disabled={currentQuestionIndex === 0}
+                            >
+                                Previous
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+                                disabled={currentQuestionIndex === questions.length - 1}
+                            >
+                                Save & Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Sidebar / Palette */}
+                <div style={{
+                    width: '320px',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderLeft: '1px solid var(--glass-border)',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}>
+                    {/* User Profile / Cam */}
+                    <div style={{
+                        height: '180px',
+                        background: '#000',
+                        position: 'relative',
+                        borderBottom: '1px solid var(--glass-border)'
+                    }}>
+                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                        <div style={{ position: 'absolute', bottom: '5px', left: '5px', fontSize: '0.7rem', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px' }}>
+                            Proctoring Active
+                        </div>
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-success)' }}></div> Answered
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-warning)' }}></div> Marked
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }}></div> Not Visited
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid var(--accent-primary)' }}></div> Current
+                        </div>
+                    </div>
+
+                    {/* Question Grid */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+                        <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', opacity: 0.8 }}>Questions Overview</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                            {questions.map((q, idx) => {
+                                const qId = q.id || idx;
+                                const isAnswered = answers[qId] !== undefined && answers[qId] !== '';
+                                const isMarked = markedForReview[qId];
+                                const isCurrent = currentQuestionIndex === idx;
+
+                                let bg = 'rgba(255,255,255,0.05)';
+                                let border = '1px solid transparent';
+                                let color = 'var(--text-secondary)';
+
+                                if (isAnswered) {
+                                    bg = 'var(--accent-success)';
+                                    color = '#fff';
+                                }
+                                if (isMarked) {
+                                    bg = 'var(--accent-warning)';
+                                    color = '#000';
+                                }
+                                if (isCurrent) {
+                                    border = '2px solid var(--accent-primary)';
+                                    color = 'white';
+                                }
+
+                                return (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setCurrentQuestionIndex(idx)}
+                                        style={{
+                                            width: '100%',
+                                            aspectRatio: '1',
+                                            borderRadius: '6px',
+                                            background: bg,
+                                            border: border,
+                                            color: color,
+                                            fontSize: '0.9rem',
+                                            fontWeight: 'bold',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {idx + 1}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Submit Button Area */}
+                    <div style={{ padding: '1.5rem', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
+                        <button
+                            onClick={handleSubmit}
+                            className="btn"
+                            style={{
+                                width: '100%',
+                                background: 'var(--accent-success)',
+                                color: 'white',
+                                padding: '0.8rem',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Submit Exam
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            {/* Submitting Overlay */}
             {(loading || submitting) && (
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
@@ -275,88 +773,37 @@ export const StudentExamPage = () => {
                 </div>
             )}
 
-
-
-            {/* Main Exam Area */}
-            <div className="glass-panel" style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>
-                    <div>
-                        <h2 style={{ fontSize: '1.5rem', margin: 0 }}>University Final Examination</h2>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Session ID: {id}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', fontWeight: 'bold', color: timeLeft < 300 ? 'var(--accent-alert)' : 'var(--text-primary)' }}>
-                        <Clock size={20} /> {formatTime(timeLeft)}
-                    </div>
-                </div>
-
-                <form onSubmit={handleSubmit}>
-                    {questions.length === 0 && !loading ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.7 }}>No questions loaded.</div>
-                    ) : (
-                        questions.map((q, i) => (
-                            <div key={q.id} style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                                <p style={{ fontWeight: 500, marginBottom: '1.5rem', fontSize: '1.1rem', lineHeight: '1.6' }}>
-                                    <span style={{ color: 'var(--accent-primary)', marginRight: '8px', fontWeight: 'bold' }}>Q{i + 1}.</span>
-                                    {q.text}
-                                </p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    {q.options?.map((opt, optIdx) => (
-                                        <label key={optIdx} style={{
-                                            display: 'flex',
-                                            alignItems: 'flex-start', // Better for wrapping text
-                                            gap: '16px',
-                                            cursor: 'pointer',
-                                            padding: '12px 16px',
-                                            borderRadius: '8px',
-                                            background: answers[q.id || i] === optIdx ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
-                                            border: answers[q.id || i] === optIdx ? '1px solid var(--accent-success)' : '1px solid rgba(255,255,255,0.1)',
-                                            transition: 'all 0.2s ease',
-                                        }}>
-                                            <input
-                                                type="radio"
-                                                name={`q_${q.id || i}`}
-                                                onChange={() => handleAnswerChange(q.id || i, optIdx)}
-                                                checked={answers[q.id || i] === optIdx}
-                                                style={{ marginTop: '4px', accentColor: 'var(--accent-primary)', width: '16px', height: '16px', flexShrink: 0 }}
-                                            />
-                                            <span style={{ fontSize: '1rem', opacity: 0.9, lineHeight: '1.5' }}>{opt}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        ))
-                    )}
-
-                    {questions.length > 0 && (
-                        <div style={{ marginTop: '3rem', textAlign: 'center' }}>
-                            <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem', borderRadius: '50px' }}>
-                                Submit Final Exam
+            {/* Custom Submit Confirmation Modal */}
+            {showSubmitModal && (
+                <div className="animate-fade-in" style={{
+                    position: 'fixed', inset: 0, zIndex: 10000,
+                    backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                        <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Submit Exam?</h3>
+                        <p style={{ marginBottom: '2rem', opacity: 0.8 }}>
+                            Are you sure you want to finish the exam? You cannot change your answers after submission.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setShowSubmitModal(false)}
+                                style={{ minWidth: '100px' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={confirmSubmit}
+                                style={{ minWidth: '100px', background: 'var(--accent-success)' }}
+                            >
+                                Confirm Submit
                             </button>
                         </div>
-                    )}
-                </form>
-            </div>
-
-            {/* Sidebar Monitoring */}
-            <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div style={{ padding: '0.8rem', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--glass-border)' }}>
-                        <h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '8px', height: '8px', background: 'var(--accent-error)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
-                            Live Proctoring
-                        </h4>
-                    </div>
-                    <div style={{ height: '210px', background: '#000', position: 'relative' }}>
-                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                        <div style={{ position: 'absolute', bottom: '10px', right: '10px', padding: '4px 8px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', fontSize: '0.7rem' }}>Status: Monitoring</div>
-                    </div>
-                    <div style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> Face visible at all times</div>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> No electronic devices</div>
-                        <div style={{ display: 'flex', gap: '8px' }}><CheckCircle size={14} color="var(--accent-success)" /> No unauthorized persons</div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
