@@ -171,18 +171,35 @@ export const StudentReportsPage = () => {
                                             <CheckCircle size={16} color="var(--accent-success)" /> Completed
                                         </span>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                            <Calendar size={16} /> {report.finished_at ? new Date(report.finished_at.seconds * 1000).toLocaleDateString() : 'Date N/A'}
+                                            <Calendar size={16} /> {(report.finished_at || report.created_at) ? ((report.finished_at || report.created_at).seconds ? new Date((report.finished_at || report.created_at).seconds * 1000).toLocaleDateString() : new Date(report.finished_at || report.created_at).toLocaleDateString()) : 'Date N/A'}
                                         </span>
                                     </div>
                                 </div>
-                                <div style={{
-                                    background: 'rgba(16, 185, 129, 0.1)',
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '8px',
-                                    textAlign: 'center'
-                                }}>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--accent-success)', fontWeight: 'bold' }}>SCORE</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>{report.score}%</div>
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <div style={{
+                                        background: 'rgba(16, 185, 129, 0.1)',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        minWidth: '100px'
+                                    }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--accent-success)', fontWeight: 'bold' }}>SCORE</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
+                                            {report.score || 0} <span style={{ fontSize: '1rem', opacity: 0.7 }}>/ {report.total || 0}</span>
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        background: 'rgba(59, 130, 246, 0.1)',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        minWidth: '100px'
+                                    }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#60a5fa', fontWeight: 'bold' }}>PERCENTAGE</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
+                                            {report.percentage || ((report.score && report.total) ? Math.round((report.score / report.total) * 100) : 0)}%
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

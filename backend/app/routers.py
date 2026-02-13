@@ -552,7 +552,8 @@ def submit_exam(session_id: str, submission: SubmitExamRequest):
             "total": total,
             "percentage": round(percentage, 2),
             "answers": submission.answers,
-            "feedback": evaluation['feedback'] # Store detailed feedback
+            "feedback": evaluation['feedback'], # Store detailed feedback
+            "finished_at": datetime.utcnow().isoformat()
         })
 
         return {
@@ -583,7 +584,8 @@ def terminate_exam(session_id: str, reason: str = "Violation of exam protocols")
         session_ref.update({
             "status": "Terminated",
             "termination_reason": reason,
-            "trust_score": 0
+            "trust_score": 0,
+            "finished_at": datetime.utcnow().isoformat()
         })
 
         return {"message": "Exam terminated successfully"}
