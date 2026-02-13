@@ -499,7 +499,9 @@ def get_session_status(session_id: str):
             "status": data.get('status'),
             "trust_score": data.get('trust_score'),
             "latest_logs": alert_messages,
-            "termination_reason": data.get('termination_reason')
+            "termination_reason": data.get('termination_reason'),
+            "latest_message": data.get('latest_message'),
+            "is_message_read": data.get('is_message_read', False)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -667,9 +669,58 @@ def log_violation(session_id: str, log: LogRequest):
             # Decrease trust score logic could go here too
         })
         
+
         return {"status": "Logged"}
     except Exception as e:
         print(f"Error logging violation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MessageRequest(BaseModel):
+    message: str
+
+@router.post("/sessions/{session_id}/message", tags=["Exam Session"])
+def send_message_to_student(session_id: str, request: MessageRequest):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        
+        # Update session with new message and unread status
+        session_ref.update({
+            "latest_message": request.message,
+            "is_message_read": False,
+            # Also log this as an event so it's in the permanent record
+            "latest_log": f"Admin Message: {request.message}"
+        })
+        
+        # Add to logs subcollection
+        session_ref.collection("logs").add({
+            "message": f"Admin: {request.message}",
+            "timestamp": datetime.utcnow().isoformat(),
+            "type": "admin_message"
+        })
+        
+        return {"status": "Message Sent"}
+    except Exception as e:
+        print(f"Error sending message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sessions/{session_id}/message/read", tags=["Exam Session"])
+def mark_message_read(session_id: str):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        session_ref.update({
+            "is_message_read": True
+        })
+        return {"status": "Marked as read"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -264,6 +264,48 @@ export const StudentExamPage = () => {
         };
     }, []);
 
+    // --- Admin Message Polling ---
+    useEffect(() => {
+        if (loading || result || terminated) return;
+
+        const pollStatus = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/sessions/${id}/status`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.latest_message && !data.is_message_read) {
+                        toast((t) => (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <AlertTriangle size={24} color="var(--accent-warning)" />
+                                <div>
+                                    <b>Proctor Message:</b>
+                                    <p style={{ margin: 0 }}>{data.latest_message}</p>
+                                </div>
+                                <button onClick={() => {
+                                    toast.dismiss(t.id);
+                                    // Mark as read
+                                    fetch(`${API_BASE_URL}/api/sessions/${id}/message/read`, {
+                                        method: 'POST',
+                                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                    });
+                                }} style={{ marginLeft: 'auto', background: 'var(--bg-primary)', border: '1px solid var(--glass-border)', padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                                    OK
+                                </button>
+                            </div>
+                        ), { duration: 10000, position: 'top-center', style: { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--accent-warning)', minWidth: '300px' } });
+                    }
+                }
+            } catch (err) {
+                console.error("Status poll error", err);
+            }
+        };
+
+        const interval = setInterval(pollStatus, 5000);
+        return () => clearInterval(interval);
+    }, [id, loading, result, terminated]);
+
 
     // MediaPipe Integration
 

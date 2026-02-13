@@ -148,7 +148,6 @@ function App() {
             {/* Public Routes (Redirect to Dashboard if logged in) */}
             <Route element={<PublicRouteGuard><PublicLayout /></PublicRouteGuard>}>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/about" element={<AboutPage />} />
               <Route path="/get-started" element={<GetStartedPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
@@ -170,6 +169,7 @@ function App() {
             </Route>
 
             <Route element={<PublicLayout />}>
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/docs" element={<APIDocsPage />} />
             </Route>
 

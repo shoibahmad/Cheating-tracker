@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
@@ -25,9 +24,13 @@ import {
     Activity,
     CheckCircle,
     Edit,
-    Trash2
+    Trash2,
+    MessageSquare,
+    X
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const AdminDashboard = () => {
     const [sessions, setSessions] = useState([]);
@@ -191,6 +194,61 @@ export const AdminDashboard = () => {
         { name: 'Flagged', value: stats.flagged },
         { name: 'Completed', value: stats.completed || 0 }
     ];
+
+    // --- Message Logic ---
+    const [messageSessionId, setMessageSessionId] = useState(null);
+    const [messageText, setMessageText] = useState("");
+
+    const handleSendMessage = async () => {
+        if (!messageText.trim()) return;
+        try {
+            await fetch(`${API_BASE_URL}/api/sessions/${messageSessionId}/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: messageText })
+            });
+            toast.success("Message sent to student");
+            setMessageSessionId(null);
+            setMessageText("");
+        } catch (err) {
+            toast.error("Failed to send message");
+        }
+    };
+
+    // --- PDF Export Logic ---
+    const exportPDF = () => {
+        const doc = new jsPDF();
+
+        doc.setFontSize(18);
+        doc.text("Exam Proctoring Report", 14, 22);
+
+        doc.setFontSize(11);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
+        doc.text(`Total Sessions: ${sessions.length}`, 14, 38);
+
+        const tableColumn = ["ID", "Student", "Exam", "Status", "Trust Score", "Score"];
+        const tableRows = [];
+
+        sessions.forEach(session => {
+            const sessionData = [
+                (session.id || "").substring(0, 8),
+                session.student_name || "Unknown",
+                session.exam_type || "N/A",
+                session.status,
+                `${session.trust_score || 0}%`,
+                session.score || 0
+            ];
+            tableRows.push(sessionData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 45,
+        });
+
+        doc.save(`exam_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
 
     const exportCSV = () => {
         if (!sessions.length) return;
@@ -404,6 +462,9 @@ export const AdminDashboard = () => {
                         <button onClick={exportCSV} className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={16} /> Export CSV
                         </button>
+                        <button onClick={exportPDF} className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileText size={16} /> Export PDF
+                        </button>
                         <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem' }}>View All</button>
                     </div>
                 </div>
@@ -497,18 +558,25 @@ export const AdminDashboard = () => {
                                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
                                             )}
                                         </td>
-                                        <td style={{ padding: '1rem' }}>
+                                        <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setMessageSessionId(session.id);
+                                                    setMessageText("");
+                                                }}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '0.4rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                title="Send Message"
+                                            >
+                                                <MessageSquare size={16} />
+                                            </button>
                                             <button
                                                 onClick={() => handleDelete(session.id)}
-                                                style={{
-                                                    background: 'none', border: 'none', cursor: 'pointer',
-                                                    color: 'var(--text-secondary)', padding: '0.5rem',
-                                                    transition: 'color 0.2s'
-                                                }}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '0.4rem', color: 'var(--accent-alert)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 title="Delete Session"
-                                                className="btn-icon-danger"
                                             >
-                                                <Trash2 size={18} />
+                                                <Trash2 size={16} />
                                             </button>
                                         </td>
 
@@ -519,6 +587,48 @@ export const AdminDashboard = () => {
                     </div>
                 )}
             </div>
+
+            {/* Message Modal */}
+            {messageSessionId && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 10000,
+                    backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div className="glass-panel" style={{ width: '400px', padding: '2rem', position: 'relative' }}>
+                        <button
+                            onClick={() => setMessageSessionId(null)}
+                            style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <MessageSquare size={20} color="var(--accent-primary)" />
+                            Send Message
+                        </h3>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Message to Student</label>
+                            <textarea
+                                value={messageText}
+                                onChange={(e) => setMessageText(e.target.value)}
+                                placeholder="e.g., Please adjust your camera angle..."
+                                style={{
+                                    width: '100%', padding: '0.75rem', borderRadius: '8px',
+                                    backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
+                                    color: '#fff', minHeight: '100px', resize: 'vertical'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            <button className="btn btn-secondary" onClick={() => setMessageSessionId(null)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleSendMessage}>Send Message</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
