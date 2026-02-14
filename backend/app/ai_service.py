@@ -67,7 +67,7 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
         print(f"Gemini Invalid Argument: {e}")
         return {"error": f"Invalid Argument (Model/Config): {e}", "questions": []}
     except Exception as e:
-        print(f"Gemini AI Error type: {type(e}")
+        print(f"Gemini AI Error type: {type(e)}")
         print(f"Gemini AI Error: {e}")
         if hasattr(e, 'response'):
              print(f"Gemini Response Feedback: {e.response.prompt_feedback}")
