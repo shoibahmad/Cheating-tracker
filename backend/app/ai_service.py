@@ -32,7 +32,7 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     if not API_KEY:
         raise Exception("GEMINI_API_KEY not configured")
 
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
 
     prompt = """
     Extract questions from this exam paper.
@@ -60,7 +60,7 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     except FailedPrecondition as e:
         print(f"Gemini Location Error: {e}")
         return {
-            "error": f"Google API Error: {e}. (Hint: Check if 'gemini-2.5-flash' is available in your region/project or try 'gemini-1.5-flash').", 
+            "error": f"Google API Error: {e}. (Hint: 'gemini-2.5-flash' might be invalid. We switched to 'gemini-2.5-flash-preview-09-2025' which was verified working).", 
             "questions": []
         }
     except InvalidArgument as e:
@@ -82,7 +82,7 @@ def analyze_student_session(monitoring_logs: list, exam_score: float):
     if not API_KEY:
         return "AI analysis unavailable (API Key missing)."
 
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
     
     prompt = f"""
     Analyze this exam session for potential academic dishonesty.
