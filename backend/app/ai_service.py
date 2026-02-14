@@ -57,10 +57,17 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
         
         return json.loads(text)
     except Exception as e:
+        print(f"Gemini AI Error type: {type(e)}")
         print(f"Gemini AI Error: {e}")
+        # Safely attempt to get more details if available (e.g. gRPC error)
+        if hasattr(e, 'details'):
+            print(f"RPC Details: {e.details()}")
+        if hasattr(e, 'debug_error_string'):
+             print(f"RPC Debug: {e.debug_error_string()}")
         if hasattr(e, 'response'):
              print(f"Gemini Response Feedback: {e.response.prompt_feedback}")
-        return {"error": str(e), "questions": []}
+             
+        return {"error": f"AI Service Error: {str(e)}", "questions": []}
 
 def analyze_student_session(monitoring_logs: list, exam_score: float):
     """
