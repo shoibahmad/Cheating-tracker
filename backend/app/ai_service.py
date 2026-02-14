@@ -60,7 +60,7 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     except FailedPrecondition as e:
         print(f"Gemini Location Error: {e}")
         return {
-            "error": "Region Error: Your server location is not supported by Gemini (Likely Free Tier restriction). Solution: Enable Billing on Google Cloud for this API Key to remove IP restrictions.", 
+            "error": f"Google API Error: {e}. (Hint: Check if 'gemini-2.5-flash' is available in your region/project or try 'gemini-1.5-flash').", 
             "questions": []
         }
     except InvalidArgument as e:
