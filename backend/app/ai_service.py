@@ -2,6 +2,7 @@ import os
 import google.generativeai as genai
 import json
 import typing_extensions as typing
+from google.api_core.exceptions import FailedPrecondition, InvalidArgument
 
 # Configure API Key
 # Try getting from os.environ (if loaded by dotenv elsewhere) or load manually logic here if needed, 
@@ -56,14 +57,18 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
             text = text[7:-3]
         
         return json.loads(text)
+    except FailedPrecondition as e:
+        print(f"Gemini Location Error: {e}")
+        return {
+            "error": "Region Error: Your server location is not supported by Gemini (Likely Free Tier restriction). Solution: Enable Billing on Google Cloud for this API Key to remove IP restrictions.", 
+            "questions": []
+        }
+    except InvalidArgument as e:
+        print(f"Gemini Invalid Argument: {e}")
+        return {"error": f"Invalid Argument (Model/Config): {e}", "questions": []}
     except Exception as e:
-        print(f"Gemini AI Error type: {type(e)}")
+        print(f"Gemini AI Error type: {type(e}")
         print(f"Gemini AI Error: {e}")
-        # Safely attempt to get more details if available (e.g. gRPC error)
-        if hasattr(e, 'details'):
-            print(f"RPC Details: {e.details()}")
-        if hasattr(e, 'debug_error_string'):
-             print(f"RPC Debug: {e.debug_error_string()}")
         if hasattr(e, 'response'):
              print(f"Gemini Response Feedback: {e.response.prompt_feedback}")
              
