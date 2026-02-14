@@ -70,7 +70,7 @@ export const AssignExamPage = () => {
             };
 
             // Use Backend API - SQLite
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/sessions`, {
+            const response = await fetch('/api/sessions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

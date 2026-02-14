@@ -34,20 +34,9 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     model = genai.GenerativeModel('gemini-2.5-flash')
 
     prompt = """
-    Analyze this exam paper document.
-    1. Extract all questions.
-    2. Determine the type of each question: 'mcq' (if it has options like A, B, C, D) or 'descriptive' (if it requires a written answer).
-    3. Format the output as a valid JSON object with a 'questions' array.
-    4. Each question object should have:
-       - 'id' (number)
-       - 'type' (string: 'mcq' or 'descriptive')
-       - 'text' (string)
-       - 'options' (array of {label, text} ONLY if type is mcq, otherwise empty array)
-       - 'correctAnswer' (label string or null if unknown/descriptive)
-       - 'marks' (number, default to 1)
-    5. Also provide a brief 'insights' string summarizing the difficulty level and topics covered.
-    
-    Return ONLY valid JSON.
+    Extract questions from this exam paper.
+    Identify if they are multiple choice (mcq) or descriptive.
+    Return a JSON object with a 'questions' array.
     """
 
     # For images, we can pass bytes directly. For PDF, we might need to be careful.
@@ -69,6 +58,8 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
         return json.loads(text)
     except Exception as e:
         print(f"Gemini AI Error: {e}")
+        if hasattr(e, 'response'):
+             print(f"Gemini Response Feedback: {e.response.prompt_feedback}")
         return {"error": str(e), "questions": []}
 
 def analyze_student_session(monitoring_logs: list, exam_score: float):
