@@ -3,7 +3,7 @@ services:
     name: secure-eval-platform
     env: docker
     plan: free
-    region: singapore
+    region: oregon
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
