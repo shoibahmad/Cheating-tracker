@@ -60,7 +60,7 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     except FailedPrecondition as e:
         print(f"Gemini Location Error: {e}")
         return {
-            "error": f"Google API Error: {e}. (Hint: 'gemini-2.5-flash' might be invalid. We switched to 'gemini-2.5-flash-preview-09-2025' which was verified working).", 
+            "error": f"Google API Error: {e}. (Hint: We are using 'gemini-2.5-flash-preview-09-2025'. If this fails, the model might not be available in your 'oregon' region or project).", 
             "questions": []
         }
     except InvalidArgument as e:
