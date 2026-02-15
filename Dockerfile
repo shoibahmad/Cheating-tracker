@@ -6,6 +6,10 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 
+# Build Arguments
+ARG VITE_FIREBASE_API_KEY
+ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+
 # Copy the rest of the frontend source code
 COPY frontend/ .
 RUN npm run build
