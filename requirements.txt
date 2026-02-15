@@ -11,3 +11,10 @@ pdf2image
 pypdf
 google-generativeai
 requests
+firebase-admin
+python-multipart
+aiofiles
+sqlmodel
+passlib
+bcrypt==4.0.1
+python-jose[cryptography]
