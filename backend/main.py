@@ -65,8 +65,8 @@ app.include_router(api_router, prefix="/api")
 # Mount "assets" from the build folder
 app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
+async def serve_react_app(full_path: str, request: Request):
     # Setup for serving the React app
     dist_dir = "frontend/dist"
     
