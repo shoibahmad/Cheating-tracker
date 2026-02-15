@@ -33,9 +33,29 @@ import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { CreatePaperPage } from './pages/Admin/CreatePaperPage';
 import { AssignExamPage } from './pages/Admin/AssignExamPage';
 import { LiveFeedPage } from './pages/Admin/LiveFeedPage';
+import { MobileRestriction } from './components/Common/MobileRestriction';
 
 
 import { Toaster } from 'react-hot-toast';
+
+// --- Mobile Guard ---
+const MobileGuard = ({ children }) => {
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 1024);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (isMobile) {
+    return <Navigate to="/mobile-restriction" replace />;
+  }
+
+  return children || <Outlet />;
+};
 
 // --- Protected Route Component ---
 const ProtectedRoute = ({ allowedRoles }) => {
@@ -154,6 +174,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               {/* Student Login alias if needed */}
               <Route path="/student/login" element={<StudentLogin />} />
+              <Route path="/mobile-restriction" element={<MobileRestriction />} />
             </Route>
 
             {/* Publicly Accessible Routes (with Header/Footer) */}
@@ -202,12 +223,14 @@ function App() {
 
             {/* Student Only Routes */}
             <Route element={<ProtectedRoute allowedRoles={['student']} />}>
-              <Route element={<DashboardLayout />}>
-                <Route path="/student" element={<StudentDashboard />} />
-                <Route path="/student/dashboard" element={<StudentDashboard />} />
-                <Route path="/student/exams" element={<StudentExamsPage />} />
-                <Route path="/student/reports" element={<StudentReportsPage />} />
-                <Route path="/student/exam/:id" element={<StudentExamPage />} />
+              <Route element={<MobileGuard />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/student" element={<StudentDashboard />} />
+                  <Route path="/student/dashboard" element={<StudentDashboard />} />
+                  <Route path="/student/exams" element={<StudentExamsPage />} />
+                  <Route path="/student/reports" element={<StudentReportsPage />} />
+                  <Route path="/student/exam/:id" element={<StudentExamPage />} />
+                </Route>
               </Route>
             </Route>
 

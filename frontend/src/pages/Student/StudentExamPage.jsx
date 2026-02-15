@@ -371,14 +371,15 @@ export const StudentExamPage = () => {
         startCamera();
 
         return () => {
-            console.log("Exam Page Unmount: Stopping Camera & FaceMesh");
+            console.log("Exam Page Logic: Stopping Camera & FaceMesh");
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             faceMeshService.stop();
             if (videoRef.current && videoRef.current.srcObject) {
                 videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                videoRef.current.srcObject = null;
             }
         };
-    }, [loading, terminated]);
+    }, [loading, terminated, result]); // Added result to dependencies to trigger stop on submit
 
     const enterFullscreen = () => {
         const elem = document.documentElement;
@@ -440,17 +441,19 @@ export const StudentExamPage = () => {
 
 
 
-    // --- Helper for Question Status Color ---
-    const getQuestionStatusColor = (q, index) => {
+    // --- Helper for Question Status State ---
+    const getQuestionStatus = (q, index) => {
         const qId = q.id || index;
         const isAnswered = answers[qId] !== undefined && answers[qId] !== '';
         const isMarked = markedForReview[qId];
         const isCurrent = currentQuestionIndex === index;
+        const isVisited = visited[index];
 
-        if (isCurrent) return 'var(--accent-primary)'; // Blue/Purple for current
-        if (isMarked) return 'var(--accent-warning)'; // Yellow for review
-        if (isAnswered) return 'var(--accent-success)'; // Green for answered
-        return 'rgba(255, 255, 255, 0.1)'; // Default gray/glass for not visited/answered
+        if (isCurrent) return 'current';
+        if (isMarked) return 'marked';
+        if (isAnswered) return 'answered';
+        if (isVisited) return 'unattended';
+        return 'not-visited';
     };
 
     // --- Renders ---
@@ -624,6 +627,32 @@ export const StudentExamPage = () => {
                 {/* Left: Question Area */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '2rem', overflowY: 'auto' }}>
 
+                    {/* New Legend Placement: Above Question */}
+                    <div style={{
+                        padding: '0.8rem 1.2rem',
+                        display: 'flex',
+                        gap: '20px',
+                        fontSize: '0.85rem',
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        marginBottom: '1.5rem',
+                        border: '1px solid var(--glass-border)',
+                        width: 'fit-content'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: 'var(--accent-success)' }}></div> Answered
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '14px', height: '14px', borderRadius: '4px', border: '2px solid var(--accent-success)', background: 'transparent' }}></div> Marked for Review
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: 'var(--accent-alert)' }}></div> Not Attended
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '14px', height: '14px', borderRadius: '4px', border: '2px solid var(--accent-primary)', background: 'rgba(255,255,255,0.1)' }}></div> Current
+                        </div>
+                    </div>
+
                     {/* Question Header */}
                     <div style={{
                         marginBottom: '1.5rem',
@@ -755,45 +784,32 @@ export const StudentExamPage = () => {
                         </div>
                     </div>
 
-                    {/* Legend */}
-                    <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-success)' }}></div> Answered
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-warning)' }}></div> Marked
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }}></div> Not Visited
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid var(--accent-primary)' }}></div> Current
-                        </div>
-                    </div>
+                    {/* Legend (Removed from here as requested, moved above question area) */}
 
                     {/* Question Grid */}
                     <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                         <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', opacity: 0.8 }}>Questions Overview</h4>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
                             {questions.map((q, idx) => {
-                                const qId = q.id || idx;
-                                const isAnswered = answers[qId] !== undefined && answers[qId] !== '';
-                                const isMarked = markedForReview[qId];
-                                const isCurrent = currentQuestionIndex === idx;
+                                const status = getQuestionStatus(q, idx);
 
                                 let bg = 'rgba(255,255,255,0.05)';
                                 let border = '1px solid transparent';
                                 let color = 'var(--text-secondary)';
 
-                                if (isAnswered) {
+                                if (status === 'answered') {
                                     bg = 'var(--accent-success)';
                                     color = '#fff';
+                                } else if (status === 'marked') {
+                                    border = '2px solid var(--accent-success)';
+                                    bg = 'transparent';
+                                    color = 'var(--text-primary)';
+                                } else if (status === 'unattended') {
+                                    bg = 'var(--accent-alert)';
+                                    color = '#fff';
                                 }
-                                if (isMarked) {
-                                    bg = 'var(--accent-warning)';
-                                    color = '#000';
-                                }
-                                if (isCurrent) {
+
+                                if (status === 'current') {
                                     border = '2px solid var(--accent-primary)';
                                     color = 'white';
                                 }
