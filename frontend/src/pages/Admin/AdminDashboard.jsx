@@ -35,7 +35,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export const AdminDashboard = () => {
+    // --- State & UI Logic ---
     const [sessions, setSessions] = useState([]);
+    const [isSessionDeleteModalOpen, setIsSessionDeleteModalOpen] = useState(false);
+    const [currentSessionIdToDelete, setCurrentSessionIdToDelete] = useState(null);
     const [stats, setStats] = useState({
         active: 0,
         flagged: 0,
@@ -47,6 +50,8 @@ export const AdminDashboard = () => {
     const COLORS = ['#10b981', '#f43f5e', '#6366f1']; // Green, Red, Indigo
     const [chartData, setChartData] = useState([]); // Real chart data
     const [performanceData, setPerformanceData] = useState([]);
+
+    console.log("Admin Dashboard Logic: Initializing with", { isSessionDeleteModalOpen });
 
     const loadData = async () => {
         try {
@@ -172,15 +177,15 @@ export const AdminDashboard = () => {
     }, []);
 
     const handleDeleteClick = (id) => {
-        setSessionIdToDelete(id);
-        setIsDeleteModalOpen(true);
+        setCurrentSessionIdToDelete(id);
+        setIsSessionDeleteModalOpen(true);
     };
 
     const executeDelete = async () => {
-        if (!sessionIdToDelete) return;
+        if (!currentSessionIdToDelete) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionIdToDelete}`, {
+            const res = await fetch(`${API_BASE_URL}/api/sessions/${currentSessionIdToDelete}`, {
                 method: 'DELETE'
             });
 
@@ -194,8 +199,8 @@ export const AdminDashboard = () => {
             console.error("Error deleting session:", err);
             toast.error("Error deleting session");
         } finally {
-            setIsDeleteModalOpen(false);
-            setSessionIdToDelete(null);
+            setIsSessionDeleteModalOpen(false);
+            setCurrentSessionIdToDelete(null);
         }
     };
 
@@ -648,11 +653,11 @@ export const AdminDashboard = () => {
             )}
 
             <ConfirmModal
-                isOpen={isDeleteModalOpen}
+                isOpen={isSessionDeleteModalOpen}
                 title="Delete Session?"
                 message="Are you sure you want to delete this session? This action cannot be undone and all data for this session will be lost."
                 onConfirm={executeDelete}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={() => setIsSessionDeleteModalOpen(false)}
                 confirmText="Delete Session"
                 type="danger"
             />

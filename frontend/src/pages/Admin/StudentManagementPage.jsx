@@ -15,8 +15,8 @@ export const StudentManagementPage = () => {
     const [editingStudent, setEditingStudent] = useState(null);
 
     // --- Delete Confirmation State ---
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [studentIdToDelete, setStudentIdToDelete] = useState(null);
+    const [isStudentDeleteModalOpen, setIsStudentDeleteModalOpen] = useState(false);
+    const [currentStudentIdToDelete, setCurrentStudentIdToDelete] = useState(null);
 
 
     // Form State
@@ -78,15 +78,15 @@ export const StudentManagementPage = () => {
     };
 
     const handleDeleteClick = (id) => {
-        setStudentIdToDelete(id);
-        setIsDeleteModalOpen(true);
+        setCurrentStudentIdToDelete(id);
+        setIsStudentDeleteModalOpen(true);
     };
 
     const executeDelete = async () => {
-        if (!studentIdToDelete) return;
+        if (!currentStudentIdToDelete) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/students/${studentIdToDelete}`, {
+            const res = await fetch(`${API_BASE_URL}/api/admin/students/${currentStudentIdToDelete}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -99,8 +99,8 @@ export const StudentManagementPage = () => {
             console.error(err);
             toast.error("Error deleting student");
         } finally {
-            setIsDeleteModalOpen(false);
-            setStudentIdToDelete(null);
+            setIsStudentDeleteModalOpen(false);
+            setCurrentStudentIdToDelete(null);
         }
     };
 
@@ -310,11 +310,11 @@ export const StudentManagementPage = () => {
             )}
 
             <ConfirmModal
-                isOpen={isDeleteModalOpen}
+                isOpen={isStudentDeleteModalOpen}
                 title="Delete Student?"
                 message="Are you sure you want to delete this student? This action cannot be undone and all data associated with this student will be removed."
                 onConfirm={executeDelete}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={() => setIsStudentDeleteModalOpen(false)}
                 confirmText="Delete Student"
                 type="danger"
             />

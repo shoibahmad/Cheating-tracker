@@ -321,7 +321,11 @@ export const StudentExamPage = () => {
     const requestRef = useRef(null);
 
     useEffect(() => {
-        if (loading || terminated) return;
+        // Camera Guard: Wait for fullscreen and ensure exam is active
+        if (loading || terminated || result || !isFullscreen) {
+            console.log("Camera Effect Guard Triggered:", { loading, terminated, result, isFullscreen });
+            return;
+        }
 
         const startCamera = async () => {
             try {
@@ -332,14 +336,12 @@ export const StudentExamPage = () => {
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    // Wait for video to be ready
                     videoRef.current.onloadedmetadata = async () => {
                         try {
                             await videoRef.current.play();
 
                             // Initialize AI
                             await faceMeshService.initialize((analysis) => {
-                                // Check grace period
                                 if (!monitoringActive.current) return;
 
                                 if (analysis.status === 'WARNING') {
@@ -372,15 +374,19 @@ export const StudentExamPage = () => {
         startCamera();
 
         return () => {
-            console.log("Exam Page Logic: Stopping Camera & FaceMesh");
+            console.log("Exam Page Logic Cleanup: Releasing Camera Resources");
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             faceMeshService.stop();
             if (videoRef.current && videoRef.current.srcObject) {
-                videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                const tracks = videoRef.current.srcObject.getTracks();
+                tracks.forEach(track => {
+                    track.stop();
+                    console.log("Stopped track:", track.kind);
+                });
                 videoRef.current.srcObject = null;
             }
         };
-    }, [loading, terminated, result]); // Added result to dependencies to trigger stop on submit
+    }, [loading, terminated, result, isFullscreen]); // Added result to dependencies to trigger stop on submit
 
     const enterFullscreen = () => {
         const elem = document.documentElement;
