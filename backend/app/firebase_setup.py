@@ -11,8 +11,19 @@ if os.path.exists(cred_path):
     cred = credentials.Certificate(cred_path)
 elif os.getenv("FIREBASE_CREDENTIALS"):
     import json
+    import ast
     # Parse JSON from environment variable
-    cred_dict = json.loads(os.getenv("FIREBASE_CREDENTIALS"))
+    cred_str = os.getenv("FIREBASE_CREDENTIALS")
+    try:
+        cred_dict = json.loads(cred_str)
+    except json.JSONDecodeError:
+        print("Warning: Failed to parse FIREBASE_CREDENTIALS as JSON. Attempting literal_eval...")
+        try:
+            cred_dict = ast.literal_eval(cred_str)
+        except Exception as e:
+            print(f"Error parsing FIREBASE_CREDENTIALS: {e}")
+            raise e
+            
     cred = credentials.Certificate(cred_dict)
 else:
     cred = None
