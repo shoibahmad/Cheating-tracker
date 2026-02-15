@@ -51,12 +51,27 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
             prompt
         ])
         
+        # Debug Logging
+        print(f"Gemini Response: {response.text}")
+        
+        if not response.text:
+             return {"error": "Gemini returned empty response (possibly safety blocked).", "questions": []}
+
         # Clean up response text to ensure it's JSON
         text = response.text.strip()
         if text.startswith('```json'):
-            text = text[7:-3]
+            text = text[7:]
+        if text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
         
+        text = text.strip()
+            
         return json.loads(text)
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error. Raw text: {response.text}")
+        return {"error": f"Failed to parse AI response. Raw: {response.text[:100]}...", "questions": []}
     except FailedPrecondition as e:
         print(f"Gemini Location Error: {e}")
         return {
@@ -134,10 +149,28 @@ def generate_exam_report(logs: list, score: float, total_questions: int):
     
     try:
         response = model.generate_content(prompt)
+        print(f"Report Gen Response: {response.text}")
+        
+        if not response.text:
+            return {"summary": "AI returned empty report.", "trust_score": None, "suspicious_moments": []}
+
         text = response.text.strip()
         if text.startswith('```json'):
-            text = text[7:-3]
+            text = text[7:]
+        if text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        
+        text = text.strip()
         return json.loads(text)
+    except json.JSONDecodeError:
+        print(f"Report Gen JSON Error. Raw: {response.text}")
+        return {
+            "trust_score": None, 
+            "summary": "Could not parse AI report.", 
+            "suspicious_moments": []
+        }
     except Exception as e:
         print(f"Report Gen Error: {e}")
         return {
