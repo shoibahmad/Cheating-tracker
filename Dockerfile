@@ -15,11 +15,12 @@ FROM python:3.11-slim
 
 # Install system dependencies for OpenCV and Tesseract
 # Removed nodejs and npm as they are not needed in this stage anymore
-RUN apt-get update && apt-get install -y \
+# python:3.11-slim is Debian 12 (Bookworm), so libgl1-mesa-glx is not available. Using libgl1 instead.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libtesseract-dev \
     poppler-utils \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
