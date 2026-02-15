@@ -1,15 +1,26 @@
-# Use an official Python runtime as a parent image
+# Stage 1: Build the frontend
+FROM node:18-alpine as build
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+RUN npm install
+
+# Copy the rest of the frontend source code
+COPY frontend/ .
+RUN npm run build
+
+# Stage 2: Setup the backend
 FROM python:3.11-slim
 
 # Install system dependencies for OpenCV and Tesseract
+# Removed nodejs and npm as they are not needed in this stage anymore
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
     poppler-utils \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    nodejs \
-    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
@@ -18,16 +29,12 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . .
 
+# Copy the built frontend assets from the build stage
+# This ensures we have the production build in the correct location
+COPY --from=build /app/frontend/dist /app/frontend/dist
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Build the frontend
-WORKDIR /app/frontend
-RUN npm install
-RUN npm run build
-
-# Switch back to app root
-WORKDIR /app
 
 # Expose port
 EXPOSE 8000
