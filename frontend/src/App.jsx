@@ -40,11 +40,11 @@ import { Toaster } from 'react-hot-toast';
 
 // --- Mobile Guard ---
 const MobileGuard = ({ children }) => {
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
 
   React.useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 768);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);

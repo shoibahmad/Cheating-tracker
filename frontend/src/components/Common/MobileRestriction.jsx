@@ -42,10 +42,10 @@ export const MobileRestriction = () => {
                     }} />
                 </div>
 
-                <h2 style={{ fontSize: '1.8rem', color: 'var(--text-primary)' }}>Laptop Required</h2>
+                <h2 style={{ fontSize: '1.8rem', color: 'var(--text-primary)' }}>Laptop or Tablet Required</h2>
 
                 <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: '1.6' }}>
-                    The Student Portal and Examination System are restricted to **Laptop or Desktop** devices only.
+                    The Student Portal and Examination System are restricted to **Laptop, Desktop, or Tablet** devices for the best experience.
                 </p>
 
                 <div style={{
@@ -67,7 +67,7 @@ export const MobileRestriction = () => {
                 </div>
 
                 <p style={{ marginTop: '1rem', fontWeight: '500', color: 'var(--text-primary)' }}>
-                    Please log in via a Computer to continue.
+                    Please log in via a Computer or Tablet to continue.
                 </p>
 
                 <div style={{
