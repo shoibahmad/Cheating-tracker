@@ -18,7 +18,6 @@ RUN npm run build
 FROM python:3.11-slim
 
 # Install system dependencies for OpenCV and Tesseract
-# Removed nodejs and npm as they are not needed in this stage anymore
 # python:3.11-slim is Debian 12 (Bookworm), so libgl1-mesa-glx is not available. Using libgl1 instead.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
@@ -31,18 +30,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set the working directory
 WORKDIR /app
 
+# Create a non-root user for security and to suppress the pip warning
+RUN useradd -m appuser && chown -R appuser /app
+
 # Copy the current directory contents into the container at /app
 COPY . .
 
 # Copy the built frontend assets from the build stage
-# This ensures we have the production build in the correct location
 COPY --from=build /app/frontend/dist /app/frontend/dist
 
+# Switch to the non-root user
+USER appuser
+
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Using --user to avoid root-owned files and adding bin to PATH
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Ensure the local bin is in PATH for the user
+ENV PATH="/home/appuser/.local/bin:${PATH}"
 
 # Expose port
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# We need to use the full path to uvicorn if it's in the user's bin
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
