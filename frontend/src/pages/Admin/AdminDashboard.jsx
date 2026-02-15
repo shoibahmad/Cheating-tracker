@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from '../../firebase';
+import { ConfirmModal } from '../../components/Common/ConfirmModal';
+
 import {
     BarChart,
     Bar,
@@ -169,23 +171,31 @@ export const AdminDashboard = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleDelete = async (sessionId) => {
-        if (!window.confirm("Are you sure you want to delete this session? This cannot be undone.")) return;
+    const handleDeleteClick = (id) => {
+        setSessionIdToDelete(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const executeDelete = async () => {
+        if (!sessionIdToDelete) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionIdToDelete}`, {
                 method: 'DELETE'
             });
 
             if (res.ok) {
                 toast.success("Session deleted successfully");
-                loadData(); // Reload data
+                loadData();
             } else {
                 toast.error("Failed to delete session");
             }
         } catch (err) {
             console.error("Error deleting session:", err);
             toast.error("Error deleting session");
+        } finally {
+            setIsDeleteModalOpen(false);
+            setSessionIdToDelete(null);
         }
     };
 
@@ -578,7 +588,7 @@ export const AdminDashboard = () => {
                                                 <MessageSquare size={16} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(session.id)}
+                                                onClick={() => handleDeleteClick(session.id)}
                                                 className="btn btn-secondary"
                                                 style={{ padding: '0.4rem', color: 'var(--accent-alert)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 title="Delete Session"
@@ -636,6 +646,16 @@ export const AdminDashboard = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Session?"
+                message="Are you sure you want to delete this session? This action cannot be undone and all data for this session will be lost."
+                onConfirm={executeDelete}
+                onCancel={() => setIsDeleteModalOpen(false)}
+                confirmText="Delete Session"
+                type="danger"
+            />
         </div>
     );
 };

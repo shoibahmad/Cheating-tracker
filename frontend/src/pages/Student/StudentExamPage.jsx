@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config';
 import { AlertTriangle, Clock, CheckCircle, Smartphone } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
@@ -364,7 +365,7 @@ export const StudentExamPage = () => {
                 }
             } catch (err) {
                 console.error("Camera Access Error:", err);
-                alert("Camera access is required for this exam. Please allow camera access.");
+                toast.error("Camera access is required for this exam. Please allow camera access.");
             }
         };
 
@@ -393,7 +394,7 @@ export const StudentExamPage = () => {
                     addWarning("Exam Started. Monitoring Active.");
                 }, 3000);
             }).catch(err => {
-                alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                toast.error(`Error attempting to enable full-screen mode: ${err.message}`);
             });
         }
     };

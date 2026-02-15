@@ -3,6 +3,8 @@ import { ArrowLeft, UserPlus, Edit, Trash2, Save, X, Search } from 'lucide-react
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
+import { ConfirmModal } from '../../components/Common/ConfirmModal';
+
 
 export const StudentManagementPage = () => {
     const navigate = useNavigate();
@@ -11,6 +13,11 @@ export const StudentManagementPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
+
+    // --- Delete Confirmation State ---
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [studentIdToDelete, setStudentIdToDelete] = useState(null);
+
 
     // Form State
     const [formData, setFormData] = useState({
@@ -70,11 +77,16 @@ export const StudentManagementPage = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this student?")) return;
+    const handleDeleteClick = (id) => {
+        setStudentIdToDelete(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const executeDelete = async () => {
+        if (!studentIdToDelete) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/students/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/api/admin/students/${studentIdToDelete}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -86,6 +98,9 @@ export const StudentManagementPage = () => {
         } catch (err) {
             console.error(err);
             toast.error("Error deleting student");
+        } finally {
+            setIsDeleteModalOpen(false);
+            setStudentIdToDelete(null);
         }
     };
 
@@ -196,7 +211,7 @@ export const StudentManagementPage = () => {
                                             <Edit size={18} />
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(student.id)}
+                                            onClick={() => handleDeleteClick(student.id)}
                                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-alert)' }}
                                         >
                                             <Trash2 size={18} />
@@ -293,6 +308,16 @@ export const StudentManagementPage = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Student?"
+                message="Are you sure you want to delete this student? This action cannot be undone and all data associated with this student will be removed."
+                onConfirm={executeDelete}
+                onCancel={() => setIsDeleteModalOpen(false)}
+                confirmText="Delete Student"
+                type="danger"
+            />
         </div>
     );
 };
