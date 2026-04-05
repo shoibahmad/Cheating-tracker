@@ -8,7 +8,7 @@ import { Logo } from '../Common/Logo';
 export const Header = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const { currentUser, userRole } = useAuth();
+    const { currentUser, userRole, loading } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -96,7 +96,9 @@ export const Header = () => {
 
                 {/* Right Side Actions */}
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    {currentUser ? (
+                    {loading ? (
+                        <div style={{ padding: '0.6rem 1rem', opacity: 0.5, fontSize: '0.85rem' }}>Authenticating...</div>
+                    ) : currentUser ? (
                         <div className="desktop-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                             <button className="btn btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%' }}>
                                 <Bell size={20} />

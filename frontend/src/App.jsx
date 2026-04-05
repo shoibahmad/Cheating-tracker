@@ -73,7 +73,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   // If user has no role yet (e.g. fresh Google signup), they must go to signup to select role
   if (!userRole) {
-    console.log("User has no role, redirecting to signup");
+    console.log("ProtectedRoute: User has no role, redirecting to signup");
     return <Navigate to="/signup" replace />;
   }
 
@@ -96,9 +96,14 @@ const PublicRouteGuard = ({ children }) => {
   console.log("PublicRouteGuard:", { currentUser: !!currentUser, userRole });
 
   // If logged in AND has a role, redirect to dashboard.
-  // If no role (new user), allow access to public pages (specifically Signup to finish setup)
   if (currentUser && userRole) {
     return <Navigate to={userRole === 'admin' ? "/admin/dashboard" : "/student/dashboard"} replace />;
+  }
+
+  // If logged in but NO role (new account), redirect to signup to finish setup
+  if (currentUser && !userRole) {
+    console.log("PublicRouteGuard: Logged in but no role, redirecting to signup");
+    return <Navigate to="/signup" replace />;
   }
 
   return children ? children : <Outlet />;

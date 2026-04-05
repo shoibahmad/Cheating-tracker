@@ -3,14 +3,14 @@ import google.generativeai as genai
 import json
 import typing_extensions as typing
 from google.api_core.exceptions import FailedPrecondition, InvalidArgument
+import grpc
 
 # Configure API Key
-# Try getting from os.environ (if loaded by dotenv elsewhere) or load manually logic here if needed, 
-# but best to rely on main.py loading .env
 API_KEY = os.getenv("GEMINI_API_KEY")
 
 if API_KEY:
     genai.configure(api_key=API_KEY)
+    print("AI Service Loaded: v2.0-Reloaded")
 
 # Define schemas for structured output
 class Option(typing.TypedDict):
@@ -32,33 +32,57 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
     if not API_KEY:
         raise Exception("GEMINI_API_KEY not configured")
 
-    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+    # Replaced preview model with standard gemini-2.5-flash per user request
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     prompt = """
-    Extract questions from this exam paper.
-    Identify if they are multiple choice (mcq) or descriptive.
-    Return a JSON object with a 'questions' array.
+    Extract all questions from this exam paper image/PDF.
+    
+    RULES:
+    1. Identify the question type: 'mcq' (Multiple Choice) or 'descriptive' (Short/Long Answer).
+    2. For 'mcq' questions, you MUST extract at least 4 options.
+    3. Return a valid JSON object.
+    
+    SCHEMA:
+    {
+      "questions": [
+        {
+          "text": "The full question text",
+          "type": "mcq" | "descriptive",
+          "options": ["Option A", "Option B", "Option C", "Option D"], 
+          "correctAnswer": "a" | "b" | "c" | "d",
+          "marks": 1
+        }
+      ],
+      "insights": "A brief overview of the exam difficulty and topics covered."
+    }
+    
+    IMPORTANT: 
+    - If a question is descriptive, leave "options" as an empty array and "correctAnswer" as null.
+    - If you can't find 4 options for an MCQ, provide empty strings for the missing ones.
+    - Ensure "correctAnswer" is a single lowercase letter corresponding to the option index (0=a, 1=b, etc.).
+    - Return ONLY the JSON object.
     """
 
-    # For images, we can pass bytes directly. For PDF, we might need to be careful.
-    # Gemini 1.5 Flash supports PDF via File API or as image parts.
-    # For simplicity, if it's a PDF, we might assume the caller converts it to images or we use File API.
-    # If the file_bytes are small, we can try passing as blob.
-    
     try:
         response = model.generate_content([
             {'mime_type': mime_type, 'data': file_bytes},
             prompt
         ])
         
-        # Debug Logging
-        print(f"Gemini Response: {response.text}")
+        # Safe access to response.text
+        try:
+            res_text = response.text
+            print(f"Gemini Response: {res_text}")
+        except Exception as text_err:
+             print(f"Error reading response text: {text_err}")
+             return {"error": "Gemini returned a response that could not be read (possibly safety blocked or invalid model response).", "questions": []}
         
-        if not response.text:
-             return {"error": "Gemini returned empty response (possibly safety blocked).", "questions": []}
+        if not res_text:
+             return {"error": "Gemini returned empty response.", "questions": []}
 
         # Clean up response text to ensure it's JSON
-        text = response.text.strip()
+        text = res_text.strip()
         if text.startswith('```json'):
             text = text[7:]
         if text.startswith('```'):
@@ -70,25 +94,40 @@ def extract_exam_and_insights(file_bytes: bytes, mime_type: str):
             
         return json.loads(text)
     except json.JSONDecodeError as e:
-        print(f"JSON Decode Error. Raw text: {response.text}")
-        return {"error": f"Failed to parse AI response. Raw: {response.text[:100]}...", "questions": []}
+        print(f"JSON Decode Error. Raw text: {res_text}")
+        return {"error": f"Failed to parse AI response. Raw: {res_text[:100]}...", "questions": []}
     except FailedPrecondition as e:
         print(f"Gemini Location Error: {e}")
         return {
-            "error": f"Google API Error: {e}. (Hint: We are using 'gemini-2.5-flash-preview-09-2025'. If this fails, the model might not be available in your 'oregon' region or project).", 
+            "error": f"Google API Error: {e}. (Hint: We are using 'gemini-2.5-flash'. If this fails, the model might not be available in your region or project).", 
             "questions": []
         }
     except InvalidArgument as e:
         print(f"Gemini Invalid Argument: {e}")
         return {"error": f"Invalid Argument (Model/Config): {e}", "questions": []}
+    except (grpc.RpcError, ConnectionError, TimeoutError) as e:
+        # SPECIFIC GRPC & NETWORK ERROR HANDLING
+        print(f"AI Service Network Error: {type(e).__name__} - {str(e)}")
+        return {
+            "error": "AI Service Connection Timeout or Network Error. The service is currently unresponsive or too slow for this file. Please try again or use a smaller/simpler file.",
+            "questions": []
+        }
     except Exception as e:
-        # Fixed syntax error in f-string
-        print(f"Gemini AI Error type: {type(e)}")
-        print(f"Gemini AI Error: {e}")
-        if hasattr(e, 'response'):
-             print(f"Gemini Response Feedback: {e.response.prompt_feedback}")
+        # BULLETPROOF ERROR HANDLING
+        # We avoid accessing any response attributes here to prevent secondary crashes
+        err_msg = str(e)
+        
+        # Guard against the specific 'prompt_feedback' attribute error which masks the real RPC failure
+        if "prompt_feedback" in err_msg or "InactiveRpcError" in err_msg:
+             err_msg = "AI Service Communication Failure (Internal SDK Error). This usually happens due to a network timeout."
              
-        return {"error": f"AI Service Error: {str(e)}", "questions": []}
+        print(f"Gemini AI Error type: {type(e)}")
+        print(f"Gemini AI Error: {err_msg}")
+             
+        return {
+            "error": f"AI Service Error: {err_msg}. Ensure 'gemini-1.5-flash' or 'gemini-2.5-flash' is available.", 
+            "questions": []
+        }
 
 def analyze_student_session(monitoring_logs: list, exam_score: float):
     """
@@ -97,7 +136,7 @@ def analyze_student_session(monitoring_logs: list, exam_score: float):
     if not API_KEY:
         return "AI analysis unavailable (API Key missing)."
 
-    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     Analyze this exam session for potential academic dishonesty.
@@ -110,8 +149,13 @@ def analyze_student_session(monitoring_logs: list, exam_score: float):
     try:
         response = model.generate_content(prompt)
         return response.text
+    except (grpc.RpcError, ConnectionError, TimeoutError):
+        return "Error analyzing session: Connection Timeout or Network Failure."
     except Exception as e:
-        return f"Error analyzing session: {e}"
+        err_msg = str(e)
+        if "prompt_feedback" in err_msg:
+             err_msg = "Internal SDK Error (Connection Failed)"
+        return f"Error analyzing session: {err_msg}"
 
 def generate_exam_report(logs: list, score: float, total_questions: int):
     """
@@ -149,12 +193,16 @@ def generate_exam_report(logs: list, score: float, total_questions: int):
     
     try:
         response = model.generate_content(prompt)
-        print(f"Report Gen Response: {response.text}")
         
-        if not response.text:
+        try:
+             res_text = response.text
+        except:
+             return {"summary": "AI returned unreadable response.", "trust_score": None, "suspicious_moments": []}
+             
+        if not res_text:
             return {"summary": "AI returned empty report.", "trust_score": None, "suspicious_moments": []}
 
-        text = response.text.strip()
+        text = res_text.strip()
         if text.startswith('```json'):
             text = text[7:]
         if text.startswith('```'):
@@ -165,17 +213,24 @@ def generate_exam_report(logs: list, score: float, total_questions: int):
         text = text.strip()
         return json.loads(text)
     except json.JSONDecodeError:
-        print(f"Report Gen JSON Error. Raw: {response.text}")
         return {
             "trust_score": None, 
             "summary": "Could not parse AI report.", 
             "suspicious_moments": []
         }
-    except Exception as e:
-        print(f"Report Gen Error: {e}")
+    except (grpc.RpcError, ConnectionError, TimeoutError):
         return {
             "trust_score": None, 
-            "summary": "Could not generate report due to AI error.", 
+            "summary": "Could not generate report: AI Service Connection Timeout.", 
+            "suspicious_moments": []
+        }
+    except Exception as e:
+        err_msg = str(e)
+        if "prompt_feedback" in err_msg:
+             err_msg = "Internal SDK Error (Connection Failed)"
+        return {
+            "trust_score": None, 
+            "summary": f"Could not generate report due to AI error: {err_msg}", 
             "suspicious_moments": []
         }
 
@@ -260,10 +315,20 @@ def evaluate_exam_submission(questions: list, student_answers: dict):
         
         try:
             response = model.generate_content(prompt)
-            text = response.text.strip()
-            if text.startswith('```json'):
-                text = text[7:-3]
-            ai_data = json.loads(text)
+            
+            try:
+                 res_text = response.text
+            except:
+                 ai_data = {"results": []}
+                 res_text = ""
+                 
+            if res_text:
+                text = res_text.strip()
+                if text.startswith('```json'):
+                    text = text[7:-3]
+                ai_data = json.loads(text)
+            else:
+                ai_data = {"results": []}
             
             for item in ai_data.get('results', []):
                 q_id = item.get('id')
@@ -274,11 +339,18 @@ def evaluate_exam_submission(questions: list, student_answers: dict):
                     "score": score,
                     "remarks": item.get('remarks')
                 }
+        except (grpc.RpcError, ConnectionError, TimeoutError) as e:
+            print(f"AI Grading Network Error: {e}")
+            for task in descriptive_tasks:
+                 results[task['id']] = { "correct": False, "score": 0, "remarks": "AI Grading Failed: Connection/Network Error." }
         except Exception as e:
-            print(f"AI Grading Error: {e}")
+            err_msg = str(e)
+            if "prompt_feedback" in err_msg:
+                 err_msg = "Internal SDK Error (Network Failed)"
+            print(f"AI Grading Error: {err_msg}")
             # Fallback: Mark as 0 to be safe, or manual review needed
             for task in descriptive_tasks:
-                 results[task['id']] = { "correct": False, "score": 0, "remarks": "AI Grading Failed" }
+                 results[task['id']] = { "correct": False, "score": 0, "remarks": f"AI Grading Failed: {err_msg}" }
 
     return {
         "score": round(total_score, 2),
