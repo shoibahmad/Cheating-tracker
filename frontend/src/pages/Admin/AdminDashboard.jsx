@@ -28,6 +28,7 @@ import {
     Edit,
     Trash2,
     MessageSquare,
+    Zap,
     X
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -314,6 +315,39 @@ export const AdminDashboard = () => {
                     </Link>
                     <Link to="/admin/students" className="btn btn-secondary" style={{ gap: '0.5rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
                         <Edit size={18} /> Manage Students
+                    </Link>
+                </div>
+            </div>
+
+            {/* AI Analysis Quick Access */}
+            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2.5rem', border: '1px solid rgba(99, 102, 241, 0.3)', background: 'rgba(99, 102, 241, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ padding: '8px', background: 'var(--accent-primary)', borderRadius: '8px', color: '#fff' }}>
+                        <Zap size={20} />
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem' }}>Advanced AI Analytics & Tools</h3>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                    <Link to="/reports" className="glass-card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s', textDecoration: 'none', color: 'inherit' }}>
+                        <Activity size={24} color="var(--accent-primary)" />
+                        <div>
+                            <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Integrity Heatmaps</p>
+                            <p style={{ fontSize: '0.75rem', opacity: 0.7, margin: 0 }}>Visual suspicion tracking.</p>
+                        </div>
+                    </Link>
+                    <Link to="/admin/grading" className="glass-card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit' }}>
+                        <Edit size={24} color="var(--accent-success)" />
+                        <div>
+                            <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Batch AI Grading</p>
+                            <p style={{ fontSize: '0.75rem', opacity: 0.7, margin: 0 }}>Bulk grading workspace.</p>
+                        </div>
+                    </Link>
+                    <Link to="/reports" className="glass-card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit' }}>
+                        <TrendingUp size={24} color="#8b5cf6" />
+                        <div>
+                            <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Difficulty Index</p>
+                            <p style={{ fontSize: '0.75rem', opacity: 0.7, margin: 0 }}>Question performance analysis.</p>
+                        </div>
                     </Link>
                 </div>
             </div>

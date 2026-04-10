@@ -32,29 +32,27 @@ export const AboutPage = () => {
             </div>
 
             {/* Core Features Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2.5rem', marginBottom: '8rem' }}>
                 <FeatureCard
                     icon={<Eye size={36} color="#f43f5e" />}
-                    title="Real-Time Computer Vision"
-                    desc="Proprietary gaze tracking and head-pose estimation detect if a candidate is seeking external help or looking away from the screen."
+                    title="Behavioral Forensics"
+                    desc="Proprietary gaze tracking, head-pose estimation, and object recognition (phones/books) detect cheating with extreme precision."
                     borderColor="#f43f5e"
                     glowColor="rgba(244, 63, 94, 0.2)"
                 />
                 <FeatureCard
                     icon={<Lock size={36} color="#10b981" />}
-                    title="Immutable Environment"
-                    desc="Zero-tolerance lockdown mode disables OS-level shortcuts, tab-switching, and multi-monitor setups to prevent resource access."
+                    title="Zero-Trust Kiosk"
+                    desc="Mandatory fullscreen lockdown with administrative overrides prevents all forms of tab switching or external resource access."
                     borderColor="#10b981"
                     glowColor="rgba(16, 185, 129, 0.2)"
                 />
                 <FeatureCard
                     icon={<Cpu size={36} color="#6366f1" />}
-                    title="Cognitive AI Grading"
-                    desc="Utilizing LLMs to understand nuance, context, and semantic meaning in descriptive answers, providing objective scores instantly."
+                    title="Reasoning Engine"
+                    desc="Utilizing Gemini AI for semantic grading, automated paper generation, and style consistency analysis to ensure total fairness."
                     borderColor="#6366f1"
                     glowColor="rgba(99, 102, 241, 0.2)"
                 />
-            </div>
 
             {/* 3-Tier Architecture Section */}
             <SectionHeader title="System Architecture" subtitle="A robust 3-tier infrastructure designed for scalability and security" />
@@ -185,7 +183,7 @@ export const AboutPage = () => {
             }}>
                 <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '4rem', textAlign: 'center' }}>The Tech Stack</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '3rem', textAlign: 'center' }}>
-                    <TechItem name="React 18" sub="Next-Gen UI" />
+                    <TechItem name="TFJS" sub="Real-time ML" />
                     <TechItem name="FastAPI" sub="High Performance" />
                     <TechItem name="Gemini Pro" sub="Reasoning AI" />
                     <TechItem name="MediaPipe" sub="Vision Engine" />

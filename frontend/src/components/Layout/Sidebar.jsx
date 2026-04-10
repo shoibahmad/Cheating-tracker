@@ -8,7 +8,9 @@ import {
     Settings,
     Activity,
     Eye,
-    FileText
+    FileText,
+    Edit,
+    Zap
 } from 'lucide-react';
 import { Logo } from '../Common/Logo';
 
@@ -24,6 +26,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
         { path: '/admin/assign-exam', label: 'Assign Exam', icon: School }, // Added for easy access
 
         // { path: '/student', label: 'Student Portal', icon: GraduationCap }, // Removed per request
+        { path: '/admin/live-feed', label: 'Live Monitoring', icon: Zap },
+        { path: '/admin/grading', label: 'Batch Grading', icon: Edit },
         { path: '/institutions', label: 'Institutions', icon: Building2 },
         { path: '/corporate', label: 'Corporate', icon: Building2 },
         { path: '/exams', label: 'Competitive Exams', icon: GraduationCap },

@@ -24,12 +24,21 @@ export const LandingPage = () => {
                         Advanced AI-powered monitoring for tracking and analytics.
                         Ensure integrity with our state-of-the-art surveillance ecosystem.
                     </p>
-                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <Link to="/signup" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
                             Get Started <ChevronRight size={20} />
                         </Link>
-                        <Link to="/about" className="btn btn-secondary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
-                            Learn More
+                        <Link to="/features" className="btn btn-primary" style={{ 
+                            padding: '1rem 2.5rem', 
+                            fontSize: '1.1rem',
+                            background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)',
+                            border: 'none',
+                            boxShadow: '0 10px 20px rgba(168, 85, 247, 0.2)'
+                        }}>
+                            View Features
+                        </Link>
+                        <Link to="/about" className="btn btn-secondary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem', background: 'transparent', border: 'none' }}>
+                            About Us
                         </Link>
                     </div>
                 </div>

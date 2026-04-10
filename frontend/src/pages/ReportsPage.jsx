@@ -28,6 +28,16 @@ export const ReportsPage = () => {
                         { id: "1", desc: "Suspicious Eye Movement", student: "EX-101", time: "2 mins ago" },
                         { id: "2", desc: "Face Not Visible", student: "EX-102", time: "5 mins ago" },
                         { id: "3", desc: "Multiple Voices", student: "EX-103", time: "12 mins ago" },
+                    ],
+                    integrity_heatmap: [
+                        { time: '0m', level: 10 }, { time: '5m', level: 15 }, { time: '10m', level: 40 }, 
+                        { time: '15m', level: 20 }, { time: '20m', level: 80 }, { time: '25m', level: 30 }
+                    ],
+                    difficulty_analytics: [
+                        { q: 'Q1', time: 45, difficulty: 'Easy' },
+                        { q: 'Q2', time: 120, difficulty: 'Hard' },
+                        { q: 'Q3', time: 80, difficulty: 'Medium' },
+                        { q: 'Q4', time: 150, difficulty: 'Hard' },
                     ]
                 });
             } finally {
@@ -96,6 +106,57 @@ export const ReportsPage = () => {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-1" style={{ gap: '2rem', marginTop: '2rem' }}>
+                {/* Integrity Heatmap */}
+                <div className="glass-card" style={{ height: '300px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                        <h3>Integrity Heatmap (Suspicion Level)</h3>
+                        <Activity size={20} style={{ color: 'var(--accent-alert)' }} />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '4px' }}>
+                        {data.integrity_heatmap.map((point, i) => (
+                            <div key={i} style={{
+                                flex: 1,
+                                height: `${point.level}%`,
+                                background: point.level > 50 ? 'var(--accent-alert)' : 'var(--accent-primary)',
+                                borderRadius: '4px',
+                                opacity: 0.6 + (point.level / 200)
+                            }}></div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginTop: '8px', opacity: 0.5 }}>
+                        <span>Start</span>
+                        <span>Mid-Exam</span>
+                        <span>Submit</span>
+                    </div>
+                </div>
+
+                {/* Difficulty Analytics */}
+                <div className="glass-card" style={{ height: '300px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                        <h3>Question Difficulty Index</h3>
+                        <BarChart size={20} style={{ opacity: 0.5 }} />
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                        {data.difficulty_analytics.map((item, i) => (
+                            <div key={i} style={{ marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '4px' }}>
+                                    <span>{item.q} ({item.difficulty})</span>
+                                    <span>Avg: {item.time}s</span>
+                                </div>
+                                <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ 
+                                        width: `${(item.time / 180) * 100}%`, 
+                                        height: '100%', 
+                                        background: item.difficulty === 'Hard' ? 'var(--accent-alert)' : 'var(--accent-success)' 
+                                    }}></div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

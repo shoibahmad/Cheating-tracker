@@ -12,6 +12,7 @@ from firebase_admin import auth
 from firebase_admin import firestore as admin_firestore # Rename to avoid confusion
 from google.cloud import firestore # For Query.DESCENDING
 from backend.app.firebase_setup import get_db
+from backend.app.ai_service import check_semantic_consistency, generate_questions_from_content
 
 router = APIRouter()
 
@@ -80,6 +81,33 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Error processing file: {e}")
         return {"status": "error", "message": str(e)}
+
+class ContentRequest(BaseModel):
+    content: str
+
+@router.post("/admin/generate-exam", tags=["Admin Service"])
+async def generate_exam_from_text(data: ContentRequest):
+    try:
+        result = generate_questions_from_content(data.content)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sessions/{session_id}/check-consistency", tags=["Exam Session"])
+async def run_consistency_check(session_id: str):
+    db = get_db()
+    try:
+        doc = db.collection("sessions").document(session_id).get()
+        if not doc.exists: raise HTTPException(status_code=404, detail="Not found")
+        data = doc.to_dict()
+        answers = data.get('answers', {})
+        # Filter for descriptive answers
+        descriptive_answers = [str(v) for v in answers.values() if isinstance(v, str) and len(v) > 20]
+        
+        analysis = check_semantic_consistency(descriptive_answers)
+        return analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Monitor Routes ---
 # Ensure haarcascade is available. If not, this might fail on startup, but standard cv2 usually has it.
@@ -659,22 +687,40 @@ def log_violation(session_id: str, log: LogRequest):
     try:
         session_ref = db.collection("sessions").document(session_id)
         
-        # Add to subcollection
+        # Determine penalty based on message content
+        penalty = 10
+        if "Locked" in log.message: penalty = 30
+        if "Terminated" in log.message: penalty = 100
+        
         session_ref.collection("logs").add({
             "message": log.message,
-            "timestamp": log.timestamp
+            "timestamp": log.timestamp,
+            "severity": "High" if penalty >= 30 else "Medium"
         })
         
-        # Update latest log on main doc for quick access
-        session_ref.update({
-            "latest_log": log.message,
-            # Decrease trust score logic could go here too
-        })
+        doc = session_ref.get()
+        if doc.exists:
+            new_trust = max(0, doc.to_dict().get("trust_score", 100) - penalty)
+            session_ref.update({"latest_log": log.message, "trust_score": new_trust})
+
         
 
         return {"status": "Logged"}
     except Exception as e:
-        print(f"Error logging violation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class QuestionTiming(BaseModel):
+    index: int
+    duration_ms: int
+
+@router.post("/sessions/{session_id}/log-timing", tags=["Exam Session"])
+def log_question_timing(session_id: str, timing: QuestionTiming):
+    db = get_db()
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        session_ref.update({f"performance.{timing.index}": timing.duration_ms})
+        return {"status": "saved"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -61,6 +61,7 @@ export const Footer = () => {
                         flexDirection: 'column',
                         gap: '0.75rem'
                     }}>
+                        <li><Link to="/features" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>System Features</Link></li>
                         <li><Link to="/about" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>About Us</Link></li>
                         <li><Link to="/docs" className="footer-link" style={{ opacity: 0.7, textDecoration: 'none', color: 'inherit', transition: 'opacity 0.2s' }}>API Documentation</Link></li>
                     </ul>

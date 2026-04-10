@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, X, LayoutDashboard, FileText, School, Building2, GraduationCap, Activity, Settings, Eye } from 'lucide-react';
+import { Menu, Bell, X, LayoutDashboard, FileText, School, Building2, GraduationCap, Activity, Settings, Eye, Zap } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ProfileDrawer } from './ProfileDrawer';
 import { useAuth } from '../../context/AuthContext';

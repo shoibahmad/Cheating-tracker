@@ -10,7 +10,9 @@ import {
     CheckCircle,
     Circle,
     BookOpen,
-    ArrowLeft
+    ArrowLeft,
+    Sparkles,
+    Zap
 } from 'lucide-react';
 
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -26,6 +28,8 @@ export const CreatePaperPage = () => {
     const [questions, setQuestions] = useState([
         { id: 'q1', type: 'mcq', text: '', options: ['', '', '', ''], correct_answer: 0 }
     ]);
+    const [aiContent, setAiContent] = useState('');
+    const [generating, setGenerating] = useState(false);
 
     const addQuestion = () => {
         const newId = `q${questions.length + 1}`;
@@ -91,6 +95,55 @@ export const CreatePaperPage = () => {
         }
     };
 
+    const handleAIGenerate = async () => {
+        if (!aiContent.trim()) {
+            toast.error("Please provide some content for AI to analyze.");
+            return;
+        }
+
+        const toastId = toast.loading("AI is crafting your exam...");
+        setGenerating(true);
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/generate-exam`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: aiContent })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.questions && data.questions.length > 0) {
+                    const formatted = data.questions.map((q, idx) => ({
+                        id: `ai_${Date.now()}_${idx}`,
+                        type: q.type || 'mcq',
+                        text: q.text,
+                        options: q.options || ['', '', '', ''],
+                        correct_answer: q.correct_answer || 0
+                    }));
+
+                    setQuestions(prev => {
+                        if (prev.length === 1 && !prev[0].text) return formatted;
+                        return [...prev, ...formatted];
+                    });
+                    
+                    if (data.title) setTitle(data.title);
+                    toast.success(`Generated ${data.questions.length} questions!`, { id: toastId });
+                    setAiContent('');
+                } else {
+                    toast.error("AI couldn't generate questions from this content.", { id: toastId });
+                }
+            } else {
+                toast.error("AI Generation Failed", { id: toastId });
+            }
+        } catch (err) {
+            toast.error("Network Error: " + err.message, { id: toastId });
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+
     return (
         <div className="container" style={{ maxWidth: '900px', paddingBottom: '4rem' }}>
             <div style={{ marginBottom: '2rem' }}>
@@ -150,6 +203,42 @@ export const CreatePaperPage = () => {
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* AI Generator Panel */}
+                <div className="glass-panel" style={{ 
+                    marginBottom: '2rem', 
+                    border: '1px solid rgba(139, 92, 246, 0.3)', 
+                    background: 'rgba(139, 92, 246, 0.05)',
+                    padding: '1.5rem'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                        <div style={{ padding: '0.5rem', background: '#8b5cf6', borderRadius: '8px', color: '#fff' }}>
+                            <Sparkles size={20} />
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>AI Question Generator</h3>
+                            <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>Paste text or content summary to generate questions instantly.</p>
+                        </div>
+                    </div>
+                    
+                    <textarea 
+                        className="glass-input"
+                        placeholder="Paste textbook content, notes, or a topic summary here..."
+                        value={aiContent}
+                        onChange={(e) => setAiContent(e.target.value)}
+                        style={{ minHeight: '120px', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', color: '#fff' }}
+                    />
+                    
+                    <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={handleAIGenerate}
+                        disabled={generating}
+                        style={{ background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', width: '100%', gap: '0.5rem' }}
+                    >
+                        <Zap size={18} /> {generating ? "AI is working..." : "Magic Generate Questions"}
+                    </button>
                 </div>
 
                 {/* Questions Section */}

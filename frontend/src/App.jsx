@@ -18,6 +18,7 @@ import { MonitorPage } from './pages/MonitorPage';
 import { MonitorSelectionPage } from './pages/MonitorSelectionPage';
 import { ScheduleExamPage } from './pages/ScheduleExamPage';
 import { AboutPage } from './pages/AboutPage';
+import { FeaturesPage } from './pages/FeaturesPage';
 import { APIDocsPage } from './pages/ApiDocsPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { InstitutionsPage } from './pages/InstitutionsPage';
@@ -29,6 +30,7 @@ import { StudentExamPage } from './pages/Student/StudentExamPage';
 import { StudentDashboard } from './pages/Student/StudentDashboard';
 import { StudentExamsPage } from './pages/Student/StudentExamsPage';
 import { StudentReportsPage } from './pages/Student/StudentReportsPage';
+import { BatchGradingPage } from './pages/Admin/BatchGradingPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { CreatePaperPage } from './pages/Admin/CreatePaperPage';
 import { AssignExamPage } from './pages/Admin/AssignExamPage';
@@ -196,6 +198,7 @@ function App() {
 
             <Route element={<PublicLayout />}>
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/features" element={<FeaturesPage />} />
               <Route path="/docs" element={<APIDocsPage />} />
             </Route>
 
@@ -217,6 +220,7 @@ function App() {
                 <Route path="/admin/assign-exam" element={<AssignExamPage />} />
                 <Route path="/admin/students" element={<StudentManagementPage />} />
                 <Route path="/admin/live-feed" element={<LiveFeedPage />} />
+                <Route path="/admin/grading" element={<BatchGradingPage />} />
                 <Route path="/schedule" element={<ScheduleExamPage />} />
                 <Route path="/monitor" element={<MonitorSelectionPage />} />
                 <Route path="/monitor/:id" element={<MonitorPage />} />

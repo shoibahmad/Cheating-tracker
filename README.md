@@ -28,8 +28,9 @@ graph TD
     end
     
     subgraph Services [AI & ML]
-        B -->|OCR / Grading| D[Google Gemini 1.5 Flash]
-        A -->|Proctoring| E
+        B -->|OCR/Grading/Consistency| D[Google Gemini 1.5 Flash]
+        A -->|Proctoring (Face/Gaze)| E
+        A -->|Object Detection (Smartphones)| I[TFJS COCO-SSD]
         B -->|Server-side Verification| H[OpenCV Haar Cascades]
     end
 
@@ -56,8 +57,9 @@ graph TD
 | :--- | :--- | :--- |
 | **Framework** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance asynchronous Python framework. |
 | **Web Server** | [Uvicorn](https://www.uvicorn.org/) | Lightning-fast ASGI server. |
-| **AI LLM** | [Google Generative AI](https://deepmind.google/technologies/gemini/) | OCR (Paper extraction) and Automated Descriptive Grading. |
-| **Proctoring** | [OpenCV](https://opencv.org/) | Server-side face count verification via Haar Cascades. |
+| **AI LLM** | [Google Generative AI](https://deepmind.google/technologies/gemini/) | OCR, Automated Grading, and Style Consistency Analysis. |
+| **Object Detection** | [TensorFlow.js](https://www.tensorflow.org/js) | Real-time prohibited item detection (books, phones). |
+| **Proctoring** | [OpenCV](https://opencv.org/) | Server-side face count verification. |
 | **Database** | [SQLModel](https://sqlmodel.tiangolo.com/) | SQL database interactions with Pydantic & SQLAlchemy. |
 | **Security** | [Firebase Admin SDK](https://firebase.google.com/docs/admin) | Identity management and real-time database access. |
 
@@ -136,8 +138,14 @@ The `FaceMeshService` processes webcam frames locally to detect cheating.
 ### 2. Generative AI Pipeline (Gemini 1.5 Flash)
 - **OCR Engine**: Extracts structured JSON from uploaded exam papers (images/PDFs).
   - *Prompt*: *"Extract questions... return JSON with 'questions' array including text, options, and correct answers."*
-- **Auto-Grading**: Grades descriptive (long-form) answers by comparing semantic meaning against expected keywords.
-  - *Logic*: Returns a partial score (0.0 to 1.0) and detailed feedback.
+- **Auto-Grading**: Grades descriptive answers by comparing semantic meaning against expected keywords.
+- **Semantic Consistency**: Analyzes writing style shifts across answers to detect external source pasting (Gemini-powered).
+- **AI Paper Generator**: Generates balanced MCQs and Descriptive questions from raw text or PDFs.
+
+### 3. Lockdown & Integrity (Kiosk Mode)
+- **Hard Fullscreen**: Attempts to exit fullscreen or switch tabs trigger an immediate **Exam Lock**.
+- **Admin Unlock Token**: Resuming a locked exam requires a unique, session-specific code from the Proctor's Live Feed.
+- **Dynamic Watermarking**: Floating, unique identifiers (ID, IP, Time) superimposed on the student interface.
 
 ---
 

@@ -357,3 +357,80 @@ def evaluate_exam_submission(questions: list, student_answers: dict):
         "total_questions": total_questions,
         "feedback": results
     }
+
+def check_semantic_consistency(student_answers: list):
+    """
+    Analyzes multiple descriptive answers from a student to detect writing style shifts.
+    """
+    if not API_KEY or not student_answers:
+        return {"suspicion_score": 0, "reason": "No answers to analyze."}
+
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    
+    prompt = f"""
+    Analyze the writing style of the following answers provided by the same student in a single exam.
+    Detect if any answer appears to be from a different source (e.g., copied from a textbook or internet) 
+    compared to the other answers based on tone, vocabulary, and complexity.
+    
+    Answers:
+    {json.dumps(student_answers)}
+    
+    Output JSON:
+    {{
+        "style_consistency_score": 0-100, // 100 is perfectly consistent, 0 is highly suspicious
+        "findings": "Explanation of style shifts detected.",
+        "suspicious_indices": [0, 1] // indices of suspicious answers
+    }}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        if text.startswith('```json'): text = text[7:-3]
+        return json.loads(text)
+    except Exception as e:
+        return {"error": str(e), "style_consistency_score": 100}
+
+def generate_questions_from_content(content: str):
+    """
+    Generates balanced MCQs and Descriptive questions from raw text.
+    """
+    if not API_KEY:
+        return {"questions": []}
+
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    
+    prompt = f"""
+    Create a professional exam based on the following content.
+    Generate 5 MCQs and 3 Descriptive questions.
+    
+    Content:
+    {content[:5000]} # Limit to 5k chars for safety
+    
+    Output JSON:
+    {{
+      "title": "Generated Exam",
+      "questions": [
+        {{
+          "text": "...",
+          "type": "mcq",
+          "options": ["A", "B", "C", "D"],
+          "correct_answer": 0, // index of correct option
+          "marks": 1
+        }},
+        {{
+          "text": "...",
+          "type": "descriptive",
+          "marks": 5
+        }}
+      ]
+    }}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        if text.startswith('```json'): text = text[7:-3]
+        return json.loads(text)
+    except Exception as e:
+        return {"error": str(e), "questions": []}

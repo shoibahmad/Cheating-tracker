@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config';
+import toast from 'react-hot-toast';
 
 
 import { useNavigate } from 'react-router-dom';
-import { Eye, AlertTriangle, Shield, User, XCircle, Search } from 'lucide-react';
+import { Eye, AlertTriangle, Shield, User, XCircle, Search, Key, Copy } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 
 export const LiveFeedPage = () => {
@@ -178,6 +179,43 @@ export const LiveFeedPage = () => {
                                     <span>Latest: {session.latest_log}</span>
                                 </div>
                             )}
+
+                            {/* Unlock Token Section */}
+                            <div style={{ 
+                                marginBottom: '1.5rem', 
+                                padding: '0.75rem', 
+                                background: 'rgba(99, 102, 241, 0.1)', 
+                                borderRadius: '8px',
+                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Key size={14} className="text-accent-primary" />
+                                    <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Unlock Code:</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <code style={{ 
+                                        fontWeight: 'bold', 
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '0.9rem',
+                                        letterSpacing: '1px'
+                                    }}>
+                                        {(session.id || "").substring(0, 6).toUpperCase()}
+                                    </code>
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText((session.id || "").substring(0, 6).toUpperCase());
+                                            toast.success("Code copied!");
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                        title="Copy Code"
+                                    >
+                                        <Copy size={14} />
+                                    </button>
+                                </div>
+                            </div>
 
                             <button
                                 onClick={() => requestTerminate(session.id, session.student_name || session.studentName)}
