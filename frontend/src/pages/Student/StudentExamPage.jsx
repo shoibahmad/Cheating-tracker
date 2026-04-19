@@ -783,45 +783,79 @@ export const StudentExamPage = () => {
                 </div>
             )}
 
-            {/* Top Header */}
+            {/* Top Header - Full Width HUD */}
             <div style={{
-                height: '60px',
-                background: 'rgba(0,0,0,0.3)',
-                borderBottom: '1px solid var(--glass-border)',
+                position: 'sticky',
+                top: 0,
+                zIndex: 100,
+                width: '100%',
+                background: 'rgba(15, 23, 42, 0.4)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0 2rem'
+                padding: '0.75rem 2rem',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
             }}>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{examTitle || "University Online Examination"}</div>
-                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Time Left:</span>
+                <div style={{ 
+                    fontWeight: 700, 
+                    fontSize: '0.95rem', 
+                    letterSpacing: '0.5px',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                }}>
+                    <div style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        borderRadius: '50%', 
+                        background: 'var(--accent-primary)',
+                        boxShadow: '0 0 10px var(--accent-primary)',
+                        animation: 'pulse 2s infinite'
+                    }} />
+                    {examTitle || "University Online Examination"}
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {/* High-Precision Timer HUD */}
+                    <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '12px',
+                        background: 'rgba(0,0,0,0.2)',
+                        padding: '4px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--glass-border)'
+                    }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Time Left:</span>
                         <span style={{
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            color: timeLeft < 300 ? 'var(--accent-alert)' : 'white',
-                            background: 'rgba(255,255,255,0.1)',
-                            padding: '4px 12px',
-                            borderRadius: '4px'
+                            fontSize: '1.1rem',
+                            fontWeight: 800,
+                            fontFamily: 'monospace',
+                            color: timeLeft < 300 ? '#f87171' : '#fff',
+                            textShadow: timeLeft < 300 ? '0 0 10px rgba(248, 113, 113, 0.5)' : 'none'
                         }}>
-                            {timeLeft !== null ? formatTime(timeLeft) : "Loading..."}
+                            {timeLeft !== null ? formatTime(timeLeft) : "00:00"}
                         </span>
                     </div>
 
+                    {/* Status Pillars */}
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        color: 'var(--accent-success)',
-                        fontSize: '0.85rem',
-                        fontWeight: 600
+                        background: 'rgba(16, 185, 129, 0.05)',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                        color: '#34d399',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
                     }}>
-                        <ShieldCheck size={16} />
+                        <ShieldCheck size={14} />
                         AI Proctoring Active
                     </div>
 
@@ -829,13 +863,13 @@ export const StudentExamPage = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: 'rgba(99, 102, 241, 0.1)',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        color: 'var(--accent-primary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 600
+                        background: 'rgba(6, 182, 212, 0.05)',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(6, 182, 212, 0.2)',
+                        color: '#22d3ee',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
                     }}>
                         <Zap size={14} />
                         Kiosk Mode

@@ -227,8 +227,11 @@ export const AssignExamPage = () => {
                                         <div style={{ fontWeight: 600, fontSize: '0.9rem', color: selectedStudentIds.includes(s.id) ? 'var(--accent-primary)' : 'white' }}>
                                             {s.full_name}
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
-                                            {s.course} {s.class_name ? ` • ${s.class_name}` : ''}
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', opacity: 0.8, fontFamily: 'monospace' }}>
+                                            {s.email}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '2px' }}>
+                                            {s.institution || s.course} {s.class_name ? ` • ${s.class_name}` : ''}
                                         </div>
                                     </div>
                                     <div style={{
