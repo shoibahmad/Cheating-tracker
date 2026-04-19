@@ -13,8 +13,11 @@ export const StudentExamPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const videoRef = useRef(null);
+    const streamRef = useRef(null); // Persistent reference for teardown
+    const requestRef = useRef(null); // Animation frame reference
     const violationProcessed = useRef(false);
     const monitoringActive = useRef(false); // Grace period control
+    const isStopping = useRef(false); // Immediate block on teardown
     const [loading, setLoading] = useState(true);
     const [terminated, setTerminated] = useState(false);
     const [showSubmitModal, setShowSubmitModal] = useState(false); // Custom Confirm Modal
@@ -28,7 +31,7 @@ export const StudentExamPage = () => {
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState({});
     const [examTitle, setExamTitle] = useState(""); // Add Title State
-    const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes in seconds
+    const [timeLeft, setTimeLeft] = useState(null); // Initialize as null to handle dynamic loading
     const [userIp, setUserIp] = useState("127.0.0.1");
     const [isLocked, setIsLocked] = useState(false);
     const [resumeToken, setResumeToken] = useState("");
@@ -92,23 +95,26 @@ export const StudentExamPage = () => {
                 }
 
                 // Load Questions
+                const examId = sessionData.exam_id || sessionData.examId || sessionData.question_paper_id;
                 if (sessionData.questions && sessionData.questions.length > 0) {
                     setQuestions(sessionData.questions);
-                } else if (sessionData.examId) {
-                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.examId}`);
+                } else if (examId) {
+                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${examId}`);
                     if (paperRes.ok) {
                         const paperData = await paperRes.json();
                         setQuestions(paperData.questions || []);
-                        if (!sessionData.examTitle) setExamTitle(paperData.title || sessionData.exam_type); // Fallback to paper title
-                    }
-                } else if (sessionData.question_paper_id) {
-                    const paperRes = await fetch(`${API_BASE_URL}/api/question-papers/${sessionData.question_paper_id}`);
-                    if (paperRes.ok) {
-                        const paperData = await paperRes.json();
-                        setQuestions(paperData.questions || []);
-                        if (!sessionData.examTitle) setExamTitle(paperData.title || sessionData.exam_type);
+                        if (!sessionData.examTitle && !sessionData.exam_title) {
+                            setExamTitle(paperData.title || sessionData.exam_type);
+                        }
                     }
                 }
+
+                // Set Timer from Session Data (Priority: Session > Paper > Default 30m)
+                const sessionDuration = sessionData.duration_minutes || sessionData.durationMinutes || sessionData.duration;
+                const paperDuration = sessionData.questions_metadata?.duration || 30; // Fallback to 30
+                const finalDuration = sessionDuration || paperDuration;
+                
+                setTimeLeft(finalDuration * 60);
 
                 // Restore Progress
                 if (sessionData.answers) {
@@ -192,6 +198,8 @@ export const StudentExamPage = () => {
                 if (isForced) {
                     setViolationReason(reason);
                 }
+                // TEARDOWN CAMERA IMMEDIATELY AFTER SUCCESSFUL SUBMIT
+                stopCamera();
             } else {
                 if (!isForced) addWarning("Submission failed. Please try again.");
             }
@@ -333,16 +341,17 @@ export const StudentExamPage = () => {
 
 
     // MediaPipe Integration
-
-    // MediaPipe Integration
-    const requestRef = useRef(null);
-
     useEffect(() => {
+        let isActive = true; // Scope-based active flag
+
         // Camera Guard: Wait for fullscreen and ensure exam is active
         if (loading || terminated || result || !isFullscreen) {
             console.log("Camera Effect Guard Triggered:", { loading, terminated, result, isFullscreen });
+            if (streamRef.current) stopCamera();
             return;
         }
+        
+        isStopping.current = false; // Reset on re-start
 
         const startCamera = async () => {
             try {
@@ -350,6 +359,8 @@ export const StudentExamPage = () => {
                     video: { width: 640, height: 480, facingMode: 'user' },
                     audio: false
                 });
+
+                streamRef.current = stream; // Save reference
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
@@ -371,27 +382,36 @@ export const StudentExamPage = () => {
                             // Initialize Object Detection
                             await objectDetectionService.initialize();
 
-                            // Start Processing Loop
-                            const processFrame = async () => {
-                                if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended && !isLocked) {
-                                    // Face Analysis
-                                    await faceMeshService.send(videoRef.current);
-                                    
-                                    // Object Detection (every few frames to save CPU)
-                                    if (Math.random() > 0.8) {
-                                        const objectViolations = await objectDetectionService.detect(videoRef.current);
-                                        if (objectViolations.length > 0) {
-                                            const detected = objectViolations.map(v => v.class).join(", ");
-                                            reportViolation(`Suspicious object detected: ${detected}`);
-                                            setIsLocked(true); // Lock on object detection too? Or just warning?
-                                            // Let's just lock to be safe/strict as per plan
-                                        }
-                                    }
-                                }
-                                requestRef.current = requestAnimationFrame(processFrame);
-                            };
-                            requestRef.current = requestAnimationFrame(processFrame);
+                             // Start Processing Loop
+                             const processFrame = async () => {
+                                 if (isStopping.current || !isActive) return;
 
+                                 if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended && !isLocked) {
+                                     try {
+                                         // Face Analysis
+                                         await faceMeshService.send(videoRef.current);
+                                         
+                                         if (isStopping.current || !isActive) return;
+
+                                         // Object Detection (every few frames to save CPU)
+                                         if (Math.random() > 0.8) {
+                                             const objectViolations = await objectDetectionService.detect(videoRef.current);
+                                             if (objectViolations.length > 0) {
+                                                 const detected = objectViolations.map(v => v.class).join(", ");
+                                                 reportViolation(`Suspicious object detected: ${detected}`);
+                                                 setIsLocked(true); 
+                                             }
+                                         }
+                                     } catch (e) {
+                                         console.warn("AI processing error during frame:", e);
+                                     }
+                                 }
+                                 
+                                 if (streamRef.current && !isStopping.current && isActive) {
+                                     requestRef.current = requestAnimationFrame(processFrame);
+                                 }
+                             };
+                             requestRef.current = requestAnimationFrame(processFrame);
                         } catch (e) {
                             console.error("Error playing video or init AI", e);
                         }
@@ -403,22 +423,40 @@ export const StudentExamPage = () => {
             }
         };
 
-        startCamera();
+        if (streamRef.current === null) {
+            startCamera();
+        }
 
         return () => {
-            console.log("Exam Page Logic Cleanup: Releasing Camera Resources");
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
-            faceMeshService.stop();
-            if (videoRef.current && videoRef.current.srcObject) {
-                const tracks = videoRef.current.srcObject.getTracks();
-                tracks.forEach(track => {
-                    track.stop();
-                    console.log("Stopped track:", track.kind);
-                });
-                videoRef.current.srcObject = null;
-            }
+            isActive = false; // Disable this effect's loop immediately
+            stopCamera();
         };
-    }, [loading, terminated, result, isFullscreen]); // Added result to dependencies to trigger stop on submit
+    }, [loading, terminated, result, isFullscreen]);
+
+    const stopCamera = () => {
+        isStopping.current = true;
+        console.log("Exam Teardown: Releasing Camera Resources");
+        if (requestRef.current) {
+            cancelAnimationFrame(requestRef.current);
+            requestRef.current = null;
+        }
+        
+        faceMeshService.stop();
+        objectDetectionService.stop();
+
+        if (streamRef.current) {
+            const tracks = streamRef.current.getTracks();
+            tracks.forEach(track => {
+                track.stop();
+                console.log("Stopped track:", track.kind);
+            });
+            streamRef.current = null;
+        }
+
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+    };
 
     const enterFullscreen = () => {
         const elem = document.documentElement;
@@ -441,9 +479,9 @@ export const StudentExamPage = () => {
 
 
 
-    // --- 3. Timer Logic (30 mins) ---
+    // --- 3. Timer Logic ---
     useEffect(() => {
-        if (loading || result || terminated) return;
+        if (loading || result || terminated || timeLeft === null) return;
 
         const timer = setInterval(() => {
             setTimeLeft(prev => {
@@ -767,7 +805,7 @@ export const StudentExamPage = () => {
                             padding: '4px 12px',
                             borderRadius: '4px'
                         }}>
-                            {formatTime(timeLeft)}
+                            {timeLeft !== null ? formatTime(timeLeft) : "Loading..."}
                         </span>
                     </div>
 

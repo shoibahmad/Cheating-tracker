@@ -41,6 +41,12 @@ class ObjectDetectionService {
             return [];
         }
     }
+
+    stop() {
+        this.isInitialized = false;
+        this.model = null;
+        console.log("ObjectDetectionService: Stopped");
+    }
 }
 
 export const objectDetectionService = new ObjectDetectionService();

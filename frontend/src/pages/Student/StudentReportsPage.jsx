@@ -214,15 +214,14 @@ export const StudentReportsPage = () => {
                             }}>
                                 <div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Suspicious Flags</div>
-                                    <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: report.cheat_score > 0 ? 'var(--accent-alert)' : 'var(--accent-success)' }}>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: (report.cheat_score || 0) > 0 ? 'var(--accent-alert)' : 'var(--accent-success)' }}>
                                         {report.cheat_score || 0}
                                     </div>
                                 </div>
                                 <div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Questions Attempted</div>
                                     <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                                        {/* Placeholder logic if detailed stats aren't saved */}
-                                        {report.total_questions || '-'}
+                                        {report.questions_attempted !== undefined ? report.questions_attempted : report.total_questions || '-'}
                                     </div>
                                 </div>
                                 <div>

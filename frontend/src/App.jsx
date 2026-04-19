@@ -11,7 +11,7 @@ import ErrorBoundary from './components/Common/ErrorBoundary';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { StudentManagementPage } from './pages/Admin/StudentManagementPage';
 import { MonitorPage } from './pages/MonitorPage';

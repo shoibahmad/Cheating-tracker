@@ -8,6 +8,8 @@ class Student(SQLModel, table=True):
     password: str  # In production, hash this!
     role: str = "student"
     institution: Optional[str] = None
+    course: Optional[str] = None
+    class_name: Optional[str] = None
 
 class Question(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

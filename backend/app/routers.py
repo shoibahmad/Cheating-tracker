@@ -217,6 +217,8 @@ class StudentModel(BaseModel):
     password: Optional[str] = None # Only needed for creation
     role: str = "student"
     institution: Optional[str] = ""
+    course: Optional[str] = ""
+    class_name: Optional[str] = ""
 
 @router.get("/admin/students", tags=["Student Management"])
 def get_students():
@@ -268,6 +270,8 @@ def create_student(student: StudentModel):
             "email": student.email,
             "role": student.role,
             "institution": student.institution,
+            "course": student.course,
+            "class_name": student.class_name,
             "uid": uid
         }
         
@@ -307,7 +311,9 @@ def update_student(student_id: str, student: StudentModel):
             "full_name": student.full_name,
             "email": student.email,
             "role": student.role,
-            "institution": student.institution
+            "institution": student.institution,
+            "course": student.course,
+            "class_name": student.class_name
         }
         
         user_ref.update(update_data)
@@ -367,6 +373,9 @@ class CreateSessionRequest(BaseModel):
     examId: str
     examTitle: str
     exam_type: str 
+    duration_minutes: Optional[int] = 30
+    course: Optional[str] = None
+    class_name: Optional[str] = None
 
 @router.post("/sessions", tags=["Exam Session"])
 def create_session(data: CreateSessionRequest):
@@ -381,16 +390,26 @@ def create_session(data: CreateSessionRequest):
         
         session_data = {
             "studentId": data.studentId,
+            "student_id": data.studentId, # Support both
             "student_name": data.student_name,
-            "exam_id": data.examId,
+            "examId": data.examId, # Support both
+            "exam_id": data.examId, 
+            "examTitle": data.examTitle, # Support both
             "exam_title": data.examTitle,
             "exam_type": data.exam_type,
+            "duration_minutes": data.duration_minutes,
+            "duration": data.duration_minutes, # Fallback
+            "course": data.course,
+            "class_name": data.class_name,
             "status": "Active",
             "trust_score": 100,
+            "cheat_score": 0,
+            "questions_attempted": 0,
             "created_at": datetime.utcnow().isoformat(),
             "termination_reason": None
         }
         
+        print(f"DEBUG: Creating session for student {data.studentId} with duration {session_data['duration_minutes']} mins")
         new_session_ref.set(session_data)
         
         return {"session_id": new_session_ref.id}
@@ -573,11 +592,22 @@ def submit_exam(session_id: str, submission: SubmitExamRequest):
         total = evaluation['total_questions']
         percentage = (score / total * 100) if total > 0 else 0
 
+        # Count number of suspicious logs
+        logs_ref = session_ref.collection("logs")
+        logs_stream = logs_ref.stream()
+        cheat_score = len(list(logs_stream)) # Simple count for now
+
+        # Calculate questions attempted
+        questions_attempted = len([v for v in submission.answers.values() if v is not None and v != ""])
+
         # Update Firestore
         session_ref.update({
             "status": "Completed",
             "score": score,
             "total": total,
+            "total_questions": total, # For consistency with frontend key
+            "questions_attempted": questions_attempted,
+            "cheat_score": cheat_score,
             "percentage": round(percentage, 2),
             "answers": submission.answers,
             "feedback": evaluation['feedback'], # Store detailed feedback

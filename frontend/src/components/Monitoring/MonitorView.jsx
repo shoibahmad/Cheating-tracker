@@ -167,9 +167,16 @@ export const MonitorView = ({ session, onBack }) => {
                     <Archive size={16} /> Back to Dashboard
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div className={`live-dot ${cameraActive ? '' : 'offline'}`} />
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cameraActive ? 'LIVE MONITORING' : 'CONNECTING...'}</span>
+                    <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div className={`live-dot ${cameraActive ? '' : 'offline'}`} />
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cameraActive ? 'LIVE MONITORING' : 'CONNECTING...'}</span>
+                        </div>
+                        {(session.course || session.class_name) && (
+                            <div style={{ fontSize: '0.75rem', opacity: 0.7, paddingLeft: '1.25rem' }}>
+                                {session.course} {session.class_name ? `| ${session.class_name}` : ''}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -9,7 +9,8 @@ import {
     ArrowLeft,
     Copy,
     CheckCircle,
-    Cpu
+    Cpu,
+    Clock
 } from 'lucide-react';
 import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { db } from '../../firebase';
@@ -21,6 +22,7 @@ export const AssignExamPage = () => {
     const [selectedPaper, setSelectedPaper] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [examType, setExamType] = useState('University');
+    const [duration, setDuration] = useState(30);
     const [generatedSession, setGeneratedSession] = useState(null);
     const [loading, setLoading] = useState(false);
     const [students, setStudents] = useState([]);
@@ -66,7 +68,10 @@ export const AssignExamPage = () => {
                 student_name: student?.full_name || 'Unknown',
                 examId: selectedPaper,
                 examTitle: paper?.title || 'Untitled Exam',
-                exam_type: examType
+                exam_type: examType,
+                duration_minutes: duration,
+                course: student?.course || '',
+                class_name: student?.class_name || ''
             };
 
             // Use Backend API - SQLite
@@ -141,7 +146,12 @@ export const AssignExamPage = () => {
                             >
                                 <option value="">-- Select Student --</option>
                                 {students.map(s => (
-                                    <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>
+                                    <option key={s.id} value={s.id}>
+                                        {s.full_name} 
+                                        {s.course ? ` - ${s.course}` : ''} 
+                                        {s.class_name ? ` - ${s.class_name}` : ''} 
+                                        ({s.email})
+                                    </option>
                                 ))}
                             </select>
                             <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}>
@@ -169,6 +179,21 @@ export const AssignExamPage = () => {
                                 ▼
                             </div>
                         </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                            <Clock size={16} color="var(--accent-warning)" /> Exam Duration (Minutes)
+                        </label>
+                        <input
+                            type="number"
+                            value={duration}
+                            onChange={(e) => setDuration(parseInt(e.target.value))}
+                            className="glass-input"
+                            style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
+                            min="1"
+                            required
+                        />
                     </div>
 
                     <div style={{ marginBottom: '2.5rem' }}>

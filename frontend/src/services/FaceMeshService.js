@@ -46,10 +46,19 @@ class FaceMeshService {
     async send(videoElement) {
         if (!this.isInitialized || !this.faceMesh) return;
 
+        // Capture a local reference to ensure it doesn't change during the await
+        const currentFaceMesh = this.faceMesh;
+
         try {
-            await this.faceMesh.send({ image: videoElement });
+            await currentFaceMesh.send({ image: videoElement });
         } catch (e) {
-            // console.error("FaceMesh send error", e); // Suppress frequent errors if frame not ready
+            // Broadly catch MediaPipe/Emscripten BindingErrors
+            const errorMsg = e.message || String(e);
+            if (errorMsg.includes('deleted') || errorMsg.includes('destroyed')) {
+                console.warn("FaceMeshService: Internal instance state invalid, cleaning up.");
+                this.isInitialized = false;
+                this.faceMesh = null;
+            }
         }
     }
 
@@ -127,13 +136,28 @@ class FaceMeshService {
     }
 
     stop() {
-        if (this.camera) {
-            this.camera.stop();
-        }
-        if (this.faceMesh) {
-            this.faceMesh.close();
-        }
         this.isInitialized = false;
+        
+        if (this.camera) {
+            try {
+                this.camera.stop();
+            } catch (e) {
+                console.warn("FaceMeshService: Camera stop error", e);
+            }
+            this.camera = null;
+        }
+
+        if (this.faceMesh) {
+            try {
+                this.faceMesh.close();
+            } catch (e) {
+                // Ignore errors during close (often occurs if already closing/closed)
+                console.warn("FaceMeshService: FaceMesh close error", e);
+            }
+            this.faceMesh = null;
+        }
+        
+        console.log("FaceMeshService: Stopped and cleaned up");
     }
 }
 
