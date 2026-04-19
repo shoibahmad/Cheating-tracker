@@ -20,10 +20,11 @@ export const AssignExamPage = () => {
 
     const [papers, setPapers] = useState([]);
     const [selectedPaper, setSelectedPaper] = useState('');
-    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [selectedStudentIds, setSelectedStudentIds] = useState([]); // Array for multi-select
+    const [searchTerm, setSearchTerm] = useState(''); // New state for filtering students
     const [examType, setExamType] = useState('University');
     const [duration, setDuration] = useState(30);
-    const [generatedSession, setGeneratedSession] = useState(null);
+    const [generatedSessions, setGeneratedSessions] = useState(null); // Rename to plural
     const [loading, setLoading] = useState(false);
     const [students, setStudents] = useState([]);
 
@@ -52,51 +53,69 @@ export const AssignExamPage = () => {
         e.preventDefault();
         setLoading(true);
 
-        if (!selectedStudentId || !selectedPaper) {
-            toast.error("Please select both a student and a paper");
+        if (selectedStudentIds.length === 0 || !selectedPaper) {
+            toast.error("Please select at least one student and a paper");
             setLoading(false);
             return;
         }
 
         try {
-            // Find selected student details
-            const student = students.find(s => s.id === selectedStudentId);
             const paper = papers.find(p => p.id === selectedPaper);
 
-            const sessionData = {
-                studentId: selectedStudentId,
-                student_name: student?.full_name || 'Unknown',
+            const bulkData = {
+                studentIds: selectedStudentIds,
                 examId: selectedPaper,
                 examTitle: paper?.title || 'Untitled Exam',
                 exam_type: examType,
-                duration_minutes: duration,
-                course: student?.course || '',
-                class_name: student?.class_name || ''
+                duration_minutes: duration
             };
 
-            // Use Backend API - SQLite
-            const response = await fetch('/api/sessions', {
+            const response = await fetch('/api/sessions/bulk', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(sessionData)
+                body: JSON.stringify(bulkData)
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to create session');
+                throw new Error(errorData.detail || 'Failed to create sessions');
             }
 
             const data = await response.json();
-            setGeneratedSession({ session_id: data.session_id });
-            toast.success("Exam assigned successfully!");
+            setGeneratedSessions(data.sessions);
+            toast.success(`${data.sessions.length} exams assigned successfully!`);
         } catch (err) {
             console.error(err);
-            toast.error('Failed to assign exam: ' + err.message);
+            toast.error('Failed to assign exams: ' + err.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    const toggleStudent = (id) => {
+        setSelectedStudentIds(prev => 
+            prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]
+        );
+    };
+
+    const selectAllVisible = (filteredStudents) => {
+        const visibleIds = filteredStudents.map(s => s.id);
+        const allSelected = visibleIds.every(id => selectedStudentIds.includes(id));
+        
+        if (allSelected) {
+            setSelectedStudentIds(prev => prev.filter(id => !visibleIds.includes(id)));
+        } else {
+            setSelectedStudentIds(prev => [...new Set([...prev, ...visibleIds])]);
+        }
+    };
+
+    const copyAllSessions = () => {
+        if (!generatedSessions) return;
+        const text = generatedSessions.map(s => `${s.student_name}: ${s.session_id}`).join('\n');
+        navigator.clipboard.writeText(text);
+        toast.success("All session records copied!");
     };
 
     const copyToClipboard = () => {
@@ -130,33 +149,104 @@ export const AssignExamPage = () => {
                 <p style={{ color: 'var(--text-secondary)' }}>Generate a unique secure session for a candidate</p>
             </div>
 
-            {!generatedSession ? (
+            {!generatedSessions ? (
                 <form onSubmit={handleAssign} className="glass-card" style={{ padding: '2.5rem' }}>
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                            <User size={16} color="var(--accent-primary)" /> Candidate Name
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <select
-                                value={selectedStudentId}
-                                onChange={(e) => setSelectedStudentId(e.target.value)}
-                                className="glass-input"
-                                style={{ width: '100%', appearance: 'none', padding: '1rem', fontSize: '1rem', cursor: 'pointer' }}
-                                required
-                            >
-                                <option value="">-- Select Student --</option>
-                                {students.map(s => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.full_name} 
-                                        {s.course ? ` - ${s.course}` : ''} 
-                                        {s.class_name ? ` - ${s.class_name}` : ''} 
-                                        ({s.email})
-                                    </option>
-                                ))}
-                            </select>
-                            <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}>
-                                ▼
+                    <div style={{ marginBottom: '2rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                <User size={16} color="var(--accent-primary)" /> Select Candidates ({selectedStudentIds.length} selected)
                             </div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                Click student cards to toggle selection
+                            </div>
+                        </label>
+
+                        {/* Search and Filters */}
+                        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+                            <input 
+                                type="text"
+                                placeholder="Search by name, course or class..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="glass-input"
+                                style={{ flex: 1, padding: '0.75rem 1rem', fontSize: '0.9rem' }}
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    const filtered = students.filter(s => 
+                                        s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        s.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        s.class_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        s.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                                    );
+                                    selectAllVisible(filtered);
+                                }}
+                                className="btn btn-secondary"
+                                style={{ padding: '0 1rem', fontSize: '0.85rem', height: 'auto' }}
+                            >
+                                Toggle All Visible
+                            </button>
+                        </div>
+
+                        {/* Student List Grid */}
+                        <div style={{ 
+                            maxHeight: '350px', 
+                            overflowY: 'auto', 
+                            background: 'rgba(0,0,0,0.2)', 
+                            borderRadius: '12px',
+                            padding: '0.5rem',
+                            border: '1px solid var(--glass-border)',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                            gap: '0.5rem'
+                        }}>
+                            {students.filter(s => 
+                                s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                s.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                s.class_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                s.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                            ).map(s => (
+                                <div 
+                                    key={s.id}
+                                    onClick={() => toggleStudent(s.id)}
+                                    style={{
+                                        padding: '0.75rem',
+                                        background: selectedStudentIds.includes(s.id) ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'rgba(255,255,255,0.03)',
+                                        border: `1px solid ${selectedStudentIds.includes(s.id) ? 'var(--accent-primary)' : 'transparent'}`,
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        justifyContent: 'space-between'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: selectedStudentIds.includes(s.id) ? 'var(--accent-primary)' : 'white' }}>
+                                            {s.full_name}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+                                            {s.course} {s.class_name ? ` • ${s.class_name}` : ''}
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        width: '18px', height: '18px',
+                                        borderRadius: '4px',
+                                        border: '1px solid var(--glass-border)',
+                                        background: selectedStudentIds.includes(s.id) ? 'var(--accent-primary)' : 'transparent',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black'
+                                    }}>
+                                        {selectedStudentIds.includes(s.id) && <CheckCircle size={12} />}
+                                    </div>
+                                </div>
+                            ))}
+                            {students.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, gridColumn: '1 / -1' }}>
+                                    No students found.
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -229,49 +319,60 @@ export const AssignExamPage = () => {
                     </button>
                 </form>
             ) : (
-                <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', borderColor: 'var(--accent-primary)', animation: 'fadeIn 0.5s ease-out' }}>
+                <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center', borderColor: 'var(--accent-primary)', animation: 'fadeIn 0.5s ease-out', maxWidth: '800px', margin: '0 auto' }}>
                     <div style={{
-                        width: '80px', height: '80px',
+                        width: '60px', height: '60px',
                         background: 'rgba(16, 185, 129, 0.1)',
                         borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        margin: '0 auto 1.5rem',
+                        margin: '0 auto 1rem',
                         color: 'var(--accent-success)'
                     }}>
-                        <CheckCircle size={40} />
+                        <CheckCircle size={30} />
                     </div>
-                    <h3 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Exam Assigned!</h3>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Share this Session ID with the candidate to start the exam.</p>
+                    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Exams Assigned Successfully!</h3>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{generatedSessions.length} sessions created. Copy the records below to share with candidates.</p>
 
-                    <div
-                        onClick={copyToClipboard}
-                        style={{
-                            background: 'rgba(0,0,0,0.4)',
-                            padding: '1.5rem',
-                            borderRadius: '12px',
-                            marginBottom: '2rem',
-                            border: '1px dashed var(--accent-primary)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}
-                        className="session-id-box"
-                        title="Click to copy"
-                    >
-                        <span style={{ fontSize: '1.5rem', fontFamily: 'monospace', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {generatedSession.session_id}
-                        </span>
-                        <Copy size={20} color="var(--text-secondary)" />
+                    <div style={{ 
+                        background: 'rgba(0,0,0,0.4)', 
+                        padding: '1rem', 
+                        borderRadius: '12px', 
+                        marginBottom: '1.5rem',
+                        border: '1px solid var(--glass-border)',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        textAlign: 'left'
+                    }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid var(--glass-border)', opacity: 0.7 }}>
+                                    <th style={{ padding: '8px', fontSize: '0.8rem', textAlign: 'left' }}>Candidate</th>
+                                    <th style={{ padding: '8px', fontSize: '0.8rem', textAlign: 'left' }}>Session ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {generatedSessions.map((s, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '10px 8px', fontSize: '0.9rem' }}>{s.student_name}</td>
+                                        <td style={{ padding: '10px 8px', fontSize: '0.9rem', fontFamily: 'monospace', color: 'var(--accent-primary)' }}>{s.session_id}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
 
                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                        <button onClick={() => navigate('/admin/dashboard')} className="btn btn-secondary">
-                            Go to Dashboard
+                        <button onClick={copyAllSessions} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Copy size={16} /> Copy All Records
                         </button>
-                        <button onClick={() => setGeneratedSession(null)} className="btn btn-primary">
-                            Assign Another
+                        <button onClick={() => setGeneratedSessions(null)} className="btn btn-primary">
+                            Assign More
+                        </button>
+                    </div>
+
+                    <div style={{ marginTop: '1.5rem' }}>
+                        <button onClick={() => navigate('/admin/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>
+                            Return to Dashboard
                         </button>
                     </div>
                 </div>

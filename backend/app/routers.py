@@ -377,6 +377,13 @@ class CreateSessionRequest(BaseModel):
     course: Optional[str] = None
     class_name: Optional[str] = None
 
+class BulkCreateSessionRequest(BaseModel):
+    studentIds: List[str]
+    examId: str
+    examTitle: str
+    exam_type: str 
+    duration_minutes: Optional[int] = 30
+
 @router.post("/sessions", tags=["Exam Session"])
 def create_session(data: CreateSessionRequest):
     db = get_db()
@@ -415,6 +422,68 @@ def create_session(data: CreateSessionRequest):
         return {"session_id": new_session_ref.id}
     except Exception as e:
         print(f"Error creating session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sessions/bulk", tags=["Exam Session"])
+def bulk_create_sessions(data: BulkCreateSessionRequest):
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+        
+    try:
+        results = []
+        batch = db.batch()
+        
+        # We need to fetch students first to get their names and courses
+        # but for speed we can also just create docs
+        # Better: Admin sends IDs, we fetch details from users collection
+        
+        for student_id in data.studentIds:
+            # Fetch student details
+            student_doc = db.collection("users").document(student_id).get()
+            if not student_doc.exists:
+                # Try students collection fallback
+                student_doc = db.collection("students").document(student_id).get()
+            
+            student_data = student_doc.to_dict() if student_doc.exists else {}
+            student_name = student_data.get("full_name", "Unknown")
+            course = student_data.get("course", "")
+            class_name = student_data.get("class_name", "")
+
+            new_session_ref = db.collection("sessions").document()
+            
+            session_data = {
+                "studentId": student_id,
+                "student_id": student_id,
+                "student_name": student_name,
+                "examId": data.examId,
+                "exam_id": data.examId, 
+                "examTitle": data.examTitle,
+                "exam_title": data.examTitle,
+                "exam_type": data.exam_type,
+                "duration_minutes": data.duration_minutes,
+                "duration": data.duration_minutes,
+                "course": course,
+                "class_name": class_name,
+                "status": "Active",
+                "trust_score": 100,
+                "cheat_score": 0,
+                "questions_attempted": 0,
+                "created_at": datetime.utcnow().isoformat(),
+                "termination_reason": None
+            }
+            
+            batch.set(new_session_ref, session_data)
+            results.append({
+                "student_id": student_id,
+                "student_name": student_name,
+                "session_id": new_session_ref.id
+            })
+            
+        batch.commit()
+        return {"sessions": results}
+    except Exception as e:
+        print(f"Error bulk creating sessions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
