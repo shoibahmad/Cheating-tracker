@@ -46,7 +46,7 @@ pyjwt==2.10.1
 pypdf==5.1.0
 pytesseract==0.3.13
 python-dotenv==1.0.1
-python-jose==3.3.0
+python-jose==3.5.0
 python-multipart==0.0.20
 pyu2f==0.1.5
 requests==2.32.3
