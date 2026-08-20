@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
+import { logger } from '../utils/logger';
 
 export const useExamSession = (sessionId, navigate) => {
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,7 @@ export const useExamSession = (sessionId, navigate) => {
       setTimeLeft(durationMins * 60);
       setLoading(false);
     } catch (err) {
-      console.error('Error loading exam:', err);
+      logger.error('Error loading exam:', err);
       toast.error('Failed to load exam session');
       setLoading(false);
     }
@@ -69,52 +70,67 @@ export const useExamSession = (sessionId, navigate) => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/status`);
         if (!res.ok) return;
+
         const data = await res.json();
 
+        // Check if terminated by admin
         if (data.status === 'Terminated') {
           setTerminated(true);
-          setTerminationReason(data.termination_reason || 'Terminated by Proctor');
+          setTerminationReason(data.termination_reason || 'Terminated by proctor');
           clearInterval(interval);
+          return;
         }
 
-        if (data.latest_message && !data.is_message_read) {
-          toast(data.latest_message, {
-            icon: '📢',
-            duration: 6000,
-            style: { background: '#1e293b', color: '#fff', border: '1px solid #3b82f6' },
-          });
-          // Mark as read
-          fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message/read`, { method: 'POST' });
+        // Check for new admin message
+        if (data.message && !data.is_message_read) {
+          setCurrentMessage(data.message);
+          toast((t) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>💬 Proctor: {data.message}</span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  // Mark as read
+                  fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message/read`, { method: 'POST' });
+                }}
+                className="btn btn-secondary"
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              >
+                Dismiss
+              </button>
+            </div>
+          ), { duration: 10000, position: 'top-right' });
         }
       } catch (err) {
-        console.error('Polling error:', err);
+        logger.error('Polling session status error', err);
       }
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [sessionId, terminated, result]);
 
-  // --- 3. Countdown Timer ---
+  // --- 3. Timer Countdown ---
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || loading || terminated || result) return;
+    if (loading || terminated || result || timeLeft <= 0) return;
 
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
-          executeSubmit();
+          clearInterval(timerRef.current);
+          // Auto-submit on time expiry
+          handleSubmit();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [timeLeft, loading, terminated, result]);
+    return () => clearInterval(timerRef.current);
+  }, [loading, terminated, result, timeLeft]);
 
   // --- 4. Submit Exam ---
-  const executeSubmit = useCallback(async () => {
-    if (submitting || !sessionId) return;
+  const handleSubmit = useCallback(async () => {
+    if (!sessionId || submitting) return;
     try {
       setSubmitting(true);
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/submit`, {
@@ -128,7 +144,7 @@ export const useExamSession = (sessionId, navigate) => {
       setResult(data);
       toast.success('Exam submitted successfully!');
     } catch (err) {
-      console.error('Error submitting exam:', err);
+      logger.error('Error submitting exam', err);
       toast.error('Failed to submit exam. Please contact proctor.');
     } finally {
       setSubmitting(false);
@@ -149,7 +165,7 @@ export const useExamSession = (sessionId, navigate) => {
           }),
         });
       } catch (err) {
-        console.error('Failed to log violation:', err);
+        logger.error('Failed to log violation', err);
       }
     },
     [sessionId, terminated]

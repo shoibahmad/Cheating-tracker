@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import { ConfirmModal } from '../../components/Common/ConfirmModal';
+import { logger } from '../../utils/logger';
 
 
 export const StudentManagementPage = () => {
@@ -34,20 +35,17 @@ export const StudentManagementPage = () => {
 
     const fetchStudents = async () => {
         try {
-            console.log("Fetching from:", `${API_BASE_URL}/api/admin/students`);
             const res = await fetch(`${API_BASE_URL}/api/admin/students`);
-            console.log("Response status:", res.status);
             if (res.ok) {
                 const data = await res.json();
-                console.log("Fetched Students:", data);
                 setStudents(data);
             } else {
                 const text = await res.text();
-                console.error("Fetch failed:", text);
+                logger.error("Fetch students failed", { status: res.status, text });
                 toast.error("Failed to fetch: " + res.status);
             }
         } catch (err) {
-            console.error("Fetch Error:", err);
+            logger.error("Fetch students exception", err);
             toast.error("Failed to load students: " + err.message);
         } finally {
             setLoading(false);
@@ -96,7 +94,7 @@ export const StudentManagementPage = () => {
                 toast.error("Failed to delete student");
             }
         } catch (err) {
-            console.error(err);
+            logger.error("Error deleting student", err);
             toast.error("Error deleting student");
         } finally {
             setIsStudentDeleteModalOpen(false);
@@ -129,7 +127,7 @@ export const StudentManagementPage = () => {
                 toast.error(data.detail || "Operation failed");
             }
         } catch (err) {
-            console.error(err);
+            logger.error("Error submitting student form", err);
             toast.error("Error submitting form");
         }
     };

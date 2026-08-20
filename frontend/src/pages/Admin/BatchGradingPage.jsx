@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../config';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 import { Check, X, AlertCircle, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { logger } from '../../utils/logger';
 
 export const BatchGradingPage = () => {
     const [exams, setExams] = useState([]);
@@ -19,7 +20,7 @@ export const BatchGradingPage = () => {
                 if (res.ok) setExams(await res.json());
                 setLoading(false);
             } catch (err) {
-                console.error(err);
+                logger.error("Error fetching question papers", err);
                 setLoading(false);
             }
         };

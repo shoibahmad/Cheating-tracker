@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
-
-
-import { useNavigate } from 'react-router-dom';
-import { Eye, AlertTriangle, Shield, User, XCircle, Search, Key, Copy } from 'lucide-react';
+import { Eye, AlertTriangle, Shield, User, XCircle, Search } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
+import { logger } from '../../utils/logger';
 
 export const LiveFeedPage = () => {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const navigate = useNavigate();
-
-
 
     // 2. Real-time Polling
     useEffect(() => {
@@ -25,7 +20,7 @@ export const LiveFeedPage = () => {
                     setSessions(data);
                 }
             } catch (err) {
-                console.error("Error fetching sessions:", err);
+                logger.error("Error fetching live sessions", err);
             } finally {
                 setLoading(false);
             }
@@ -53,14 +48,14 @@ export const LiveFeedPage = () => {
                 method: 'POST'
             });
             if (res.ok) {
-                // Optimistic update or wait for poll
                 setSessions(prev => prev.filter(s => s.id !== sessionId));
+                toast.success(`Terminated session for ${studentName || 'student'}`);
             } else {
-                alert("Failed to terminate session");
+                toast.error("Failed to terminate session");
             }
         } catch (err) {
-            console.error("Error terminating:", err);
-            alert("Failed to terminate.");
+            logger.error("Error terminating session", err);
+            toast.error("Failed to terminate session");
         } finally {
             setConfirmModal({ show: false, sessionId: null, studentName: '' });
         }
@@ -165,7 +160,9 @@ export const LiveFeedPage = () => {
                                         const res = await fetch(`${API_BASE_URL}/api/sessions/${session.id}/logs`);
                                         const logs = await res.json();
                                         setLogsModal({ show: true, logs: logs });
-                                    } catch (e) { console.error(e); }
+                                    } catch (e) {
+                                        logger.error("Error fetching session logs", e);
+                                    }
                                 }}
                                 className="btn btn-secondary"
                                 style={{ width: '100%', marginBottom: '1rem', padding: '0.8rem', fontSize: '0.9rem' }}

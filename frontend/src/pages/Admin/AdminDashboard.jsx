@@ -15,6 +15,7 @@ import {
 } from '../../utils/dashboardStats';
 import { Users, ShieldAlert, FileText, Activity, Zap, MessageSquare } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { logger } from '../../utils/logger';
 
 export const AdminDashboard = () => {
   const [sessions, setSessions] = useState([]);
@@ -31,7 +32,7 @@ export const AdminDashboard = () => {
       const data = await res.json();
       setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error loading dashboard data:', err);
+      logger.error('Error loading dashboard data', err);
       toast.error('Failed to load dashboard data');
       setSessions([]);
     } finally {
@@ -52,7 +53,7 @@ export const AdminDashboard = () => {
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       toast.success('Session deleted');
     } catch (err) {
-      console.error('Error deleting session:', err);
+      logger.error('Error deleting session', err);
       toast.error('Failed to delete session');
     }
   };
@@ -71,7 +72,7 @@ export const AdminDashboard = () => {
       setAdminMessage('');
       setMessageModalSessionId(null);
     } catch (err) {
-      console.error('Error sending message:', err);
+      logger.error('Error sending message', err);
       toast.error('Failed to send message');
     }
   };
