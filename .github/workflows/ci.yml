@@ -42,18 +42,18 @@ jobs:
 
       - name: Run backend tests with coverage gate (>= 75%)
         env:
-            GEMINI_API_KEY: "test-key-ci"
-            FIREBASE_CREDENTIALS: ""
-            LOG_LEVEL: "WARNING"
+          GEMINI_API_KEY: "test-key-ci"
+          FIREBASE_CREDENTIALS: ""
+          LOG_LEVEL: "WARNING"
         run: |
-            pytest backend/tests/ -v --cov=backend/app --cov-fail-under=75 --cov-report=term-missing --cov-report=xml
+          pytest backend/tests/ -v --cov=backend/app --cov-fail-under=75 --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-            name: backend-coverage
-            path: coverage.xml
+          name: backend-coverage
+          path: coverage.xml
 
   # ─── Frontend Tests ──────────────────────────────────────────
   frontend-test:
@@ -83,18 +83,26 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Run frontend tests
+      - name: Run frontend tests with coverage gate
         working-directory: frontend
-        run: npm test
+        run: npm run test:coverage
 
-  # ─── Security Audit (Hard Gating) ────────────────────────────
+  # ─── Security Audit & Secret Scanning (Hard Gated) ───────────
   security-audit:
-    name: Security – Dependency Audit
+    name: Security – Dependency & Secret Audit
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
