@@ -98,35 +98,61 @@ class TestEvaluateExamSubmission:
 
     def test_mixed_mcq_grading(self):
         questions = [
-            {"id": 0, "text": "Q1", "type": "mcq", "correct_answer": 0},
-            {"id": 1, "text": "Q2", "type": "mcq", "correct_answer": 2},
-            {"id": 2, "text": "Q3", "type": "mcq", "correct_answer": 1},
+            {"id": "q1", "text": "Q1", "type": "mcq", "correct_answer": 0},
+            {"id": "q2", "text": "Q2", "type": "mcq", "correct_answer": 2},
+            {"id": "q3", "text": "Q3", "type": "mcq", "correct_answer": 1},
         ]
-        answers = {"0": "0", "1": "2", "2": "3"}
+        answers = {"q1": "0", "q2": "1", "q3": "1"}
 
         result = evaluate_exam_submission(questions, answers)
-        assert result["score"] == 2.0  # Q1 and Q2 correct
+        assert result["score"] == 2.0
         assert result["total_questions"] == 3
+        assert result["feedback"]["q1"]["correct"] is True
+        assert result["feedback"]["q2"]["correct"] is False
+        assert result["feedback"]["q3"]["correct"] is True
 
-    def test_empty_questions(self):
+    def test_empty_submission(self):
         result = evaluate_exam_submission([], {})
         assert result["score"] == 0
         assert result["total_questions"] == 0
 
+    @patch("backend.app.ai_service.API_KEY", None)
+    def test_evaluation_without_api_key(self):
+        result = evaluate_exam_submission([{"type": "descriptive", "text": "Describe gravity"}], {"0": "A force"})
+        assert result == {"error": "AI Service Unavailable"}
+
     @patch("backend.app.ai_service.genai")
-    def test_descriptive_with_ai_grading(self, mock_genai):
+    def test_descriptive_grading_success(self, mock_genai):
         mock_response = MagicMock()
-        mock_response.text = json.dumps({"results": [{"id": "0", "score": 0.8, "remarks": "Good answer"}]})
+        mock_response.text = json.dumps({
+            "results": [
+                {"id": "q1", "score": 0.85, "remarks": "Very thorough explanation."}
+            ]
+        })
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
         mock_genai.GenerativeModel.return_value = mock_model
 
-        questions = [{"id": 0, "text": "Explain OOP", "type": "descriptive"}]
-        answers = {"0": "Object-oriented programming is a paradigm..."}
+        questions = [{"id": "q1", "type": "descriptive", "text": "Explain Photosynthesis"}]
+        answers = {"q1": "Plants turn sunlight into energy"}
 
         result = evaluate_exam_submission(questions, answers)
-        assert result["score"] == 0.8
-        assert result["feedback"]["0"]["remarks"] == "Good answer"
+        assert result["score"] == 0.85
+        assert result["feedback"]["q1"]["correct"] is True
+        assert result["feedback"]["q1"]["remarks"] == "Very thorough explanation."
+
+    @patch("backend.app.ai_service.genai")
+    def test_descriptive_grading_network_error_fallback(self, mock_genai):
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = TimeoutError("Connection timed out")
+        mock_genai.GenerativeModel.return_value = mock_model
+
+        questions = [{"id": "q1", "type": "descriptive", "text": "Explain Gravity"}]
+        answers = {"q1": "Attractive force between masses"}
+
+        result = evaluate_exam_submission(questions, answers)
+        assert result["score"] == 0.0
+        assert "Connection/Network Error" in result["feedback"]["q1"]["remarks"]
 
 
 class TestExtractExamAndInsights:
@@ -135,7 +161,13 @@ class TestExtractExamAndInsights:
     @patch("backend.app.ai_service.genai")
     def test_successful_extraction(self, mock_genai):
         mock_response = MagicMock()
-        mock_response.text = json.dumps({"questions": [{"text": "Q1", "type": "mcq"}], "insights": "Easy exam"})
+        mock_response.text = json.dumps(
+            {
+                "questions": [
+                    {"text": "What is Python?", "type": "mcq", "options": ["A", "B", "C", "D"], "correct_answer": 0}
+                ]
+            }
+        )
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
         mock_genai.GenerativeModel.return_value = mock_model
@@ -154,6 +186,18 @@ class TestExtractExamAndInsights:
 
         result = extract_exam_and_insights(b"fake-image-bytes", "image/png")
         assert "error" in result
+
+    @patch("backend.app.ai_service.genai")
+    def test_extraction_empty_response(self, mock_genai):
+        mock_response = MagicMock()
+        mock_response.text = ""
+        mock_model = MagicMock()
+        mock_model.generate_content.return_value = mock_response
+        mock_genai.GenerativeModel.return_value = mock_model
+
+        result = extract_exam_and_insights(b"fake-image-bytes", "image/png")
+        assert "error" in result
+        assert "empty response" in result["error"].lower()
 
     @patch("backend.app.ai_service.API_KEY", None)
     def test_extraction_without_api_key(self):
@@ -197,6 +241,16 @@ class TestGenerateExamReport:
         result = generate_exam_report(long_logs, 5, 10)
         assert "trust_score" in result
 
+    @patch("backend.app.ai_service.genai")
+    def test_report_network_error_fallback(self, mock_genai):
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = ConnectionError("Network unreachable")
+        mock_genai.GenerativeModel.return_value = mock_model
+
+        result = generate_exam_report([], 5, 10)
+        assert result["trust_score"] is None
+        assert "Timeout" in result["summary"]
+
 
 class TestCheckSemanticConsistency:
     """Tests for the check_semantic_consistency function."""
@@ -209,6 +263,21 @@ class TestCheckSemanticConsistency:
     def test_without_api_key(self):
         result = check_semantic_consistency(["Some answer"])
         assert result["suspicion_score"] == 0
+
+    @patch("backend.app.ai_service.genai")
+    def test_successful_consistency_check(self, mock_genai):
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "style_consistency_score": 95,
+            "findings": "Consistent tone throughout answers.",
+            "suspicious_indices": []
+        })
+        mock_model = MagicMock()
+        mock_model.generate_content.return_value = mock_response
+        mock_genai.GenerativeModel.return_value = mock_model
+
+        result = check_semantic_consistency(["First answer about physics.", "Second answer about thermodynamics."])
+        assert result["style_consistency_score"] == 95
 
 
 class TestGenerateQuestionsFromContent:
