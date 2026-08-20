@@ -9,7 +9,6 @@ Verifies:
 """
 
 from fastapi.testclient import TestClient
-from backend.main import app
 
 
 class TestSecurityHeaders:
@@ -42,6 +41,7 @@ class TestRateLimitingMiddleware:
     def test_rate_limit_trips_after_excessive_requests(self):
         # Create an app instance with low threshold for test isolation
         from fastapi import FastAPI
+
         from backend.app.middleware.rate_limit import RateLimitMiddleware
 
         test_app = FastAPI()
