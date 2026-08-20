@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { API_BASE_URL } from '../../config';
 import { Archive, Eye, AlertTriangle } from 'lucide-react';
+import { logger } from '../../utils/logger';
 
 export const MonitorView = ({ session, onBack }) => {
     const [logs, setLogs] = useState(session.alerts || []);
@@ -27,7 +28,7 @@ export const MonitorView = ({ session, onBack }) => {
                     }
                 }
             } catch (err) {
-                console.error("Error accessing camera:", err);
+                logger.error("Error accessing camera", err);
             }
         };
         startCamera();
@@ -78,7 +79,7 @@ export const MonitorView = ({ session, onBack }) => {
                 }
             }
         } catch (e) {
-            console.error("Analysis failed", e);
+            logger.error("Analysis failed", e);
         }
     };
 
@@ -102,7 +103,7 @@ export const MonitorView = ({ session, onBack }) => {
         // In real app, send to backend here
         fetch(`${API_BASE_URL}/api/alert?session_id=${session.id}&alert_message=${encodeURIComponent(newAlert)}`, {
             method: 'POST'
-        }).catch(console.error);
+        }).catch((err) => logger.error("Failed to post simulated alert", err));
     };
 
     // ... handleTerminate ...

@@ -15,8 +15,9 @@ import {
     Zap
 } from 'lucide-react';
 
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from '../../firebase';
+import { BackButton } from '../../components/Common/BackButton';
+import { examsService } from '../../services/examsService';
+import { logger } from '../../utils/logger';
 import { useAuth } from '../../context/AuthContext';
 
 export const CreatePaperPage = () => {
@@ -78,19 +79,16 @@ export const CreatePaperPage = () => {
                     options: q.type === 'mcq' ? q.options : [],
                     correct_answer: q.type === 'mcq' ? q.correct_answer : null
                 })),
-                createdAt: serverTimestamp(),
-                createdBy: currentUser ? currentUser.uid : 'admin',
-                totalQuestions: questions.length,
-                status: 'draft' // or 'published'
+                status: 'draft'
             };
 
-            await addDoc(collection(db, "exams"), paper);
+            await examsService.createPaper(paper, currentUser ? currentUser.uid : 'admin');
 
             toast.success('Question Paper Created Successfully!', { id: toastId });
             navigate('/admin/dashboard');
 
         } catch (err) {
-            console.error(err);
+            logger.error('Error creating question paper', err);
             toast.error('Error creating paper: ' + err.message, { id: toastId });
         }
     };
@@ -147,22 +145,7 @@ export const CreatePaperPage = () => {
     return (
         <div className="container" style={{ maxWidth: '900px', paddingBottom: '4rem' }}>
             <div style={{ marginBottom: '2rem' }}>
-                <button
-                    onClick={() => navigate(-1)}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '1rem',
-                        fontSize: '0.9rem'
-                    }}
-                >
-                    <ArrowLeft size={16} /> Back to Dashboard
-                </button>
+                <BackButton to="/admin/dashboard" label="Back to Dashboard" style={{ marginBottom: '1rem' }} />
                 <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Create Question Paper</h2>
                 <p style={{ color: 'var(--text-secondary)' }}>Design a new exam paper for students</p>
             </div>

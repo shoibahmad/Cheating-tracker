@@ -12,8 +12,9 @@ import {
     Cpu,
     Clock
 } from 'lucide-react';
-import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
-import { db } from '../../firebase';
+import { BackButton } from '../../components/Common/BackButton';
+import { examsService } from '../../services/examsService';
+import { logger } from '../../utils/logger';
 
 export const AssignExamPage = () => {
     const navigate = useNavigate();
@@ -31,18 +32,14 @@ export const AssignExamPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch Question Papers
-                const papersSnapshot = await getDocs(collection(db, "exams"));
-                const papersList = papersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const [papersList, studentsList] = await Promise.all([
+                    examsService.fetchPapers(),
+                    examsService.fetchStudents()
+                ]);
                 setPapers(papersList);
-
-                // Fetch Students from 'users' collection where role is 'student'
-                const studentsQuery = query(collection(db, "users"), where("role", "==", "student"));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setStudents(studentsList);
             } catch (err) {
-                console.error("Error fetching data:", err);
+                logger.error("Error fetching papers or students", err);
                 toast.error("Failed to load data");
             }
         };
@@ -70,24 +67,11 @@ export const AssignExamPage = () => {
                 duration_minutes: duration
             };
 
-            const response = await fetch('/api/sessions/bulk', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bulkData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to create sessions');
-            }
-
-            const data = await response.json();
+            const data = await examsService.assignExam(bulkData);
             setGeneratedSessions(data.sessions);
             toast.success(`${data.sessions.length} exams assigned successfully!`);
         } catch (err) {
-            console.error(err);
+            logger.error("Failed to assign exams", err);
             toast.error('Failed to assign exams: ' + err.message);
         } finally {
             setLoading(false);
@@ -127,22 +111,7 @@ export const AssignExamPage = () => {
 
     return (
         <div className="container" style={{ maxWidth: '700px', paddingBottom: '3rem' }}>
-            <button
-                onClick={() => navigate(-1)}
-                style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    marginBottom: '1.5rem',
-                    fontSize: '0.9rem'
-                }}
-            >
-                <ArrowLeft size={16} /> Back to Dashboard
-            </button>
+            <BackButton to="/admin/dashboard" label="Back to Dashboard" style={{ marginBottom: '1.5rem' }} />
 
             <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
                 <h2 style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>Assign Exam</h2>
