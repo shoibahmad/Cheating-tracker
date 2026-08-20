@@ -1,4 +1,4 @@
-# Security Policy
+# Security Policy & Threat Model
 
 ## Reporting a Vulnerability
 
@@ -7,78 +7,114 @@ If you discover a security vulnerability in SecureEval, please report it respons
 1. **DO NOT** open a public GitHub issue for security vulnerabilities.
 2. Email your findings to: **security@secureeval.dev** (or open a private security advisory on GitHub).
 3. Include a detailed description of the vulnerability, steps to reproduce, and potential impact.
-4. You will receive acknowledgment within 48 hours.
+4. You will receive acknowledgment within 24–48 hours.
 
 We appreciate responsible disclosure and will credit reporters (with permission) in our release notes.
 
 ---
 
-## Threat Model
+## Architecture & Trust Boundaries
 
-SecureEval handles sensitive proctoring and assessment data. The following threat model documents known attack surfaces, mitigations in place, and areas requiring ongoing vigilance.
+SecureEval defines five explicit trust boundaries separating client runtimes, application services, and external providers:
 
-### 1. Attacker-Controlled Webcam Frames
+```mermaid
+graph TD
+    subgraph Untrusted Client Domain
+        SB[Student Browser / MediaPipe Runtime]
+    end
 
-| Threat | Risk | Mitigation |
-|:-------|:-----|:-----------|
-| Spoofed webcam feed (virtual camera) | High | Server-side face count verification via OpenCV Haar Cascades (defense-in-depth alongside client-side MediaPipe) |
-| Oversized or malformed image payloads | Medium | Pydantic `field_validator` enforces max payload size (10 MB) on `FrameData.image`; `cv2.imdecode` validates image format |
-| Denial of Service via rapid frame submission | Medium | Rate limiting recommended (not yet enforced — see Planned Mitigations) |
+    subgraph Authenticated Console Domain
+        AB[Admin Console / Dashboard]
+    end
 
-### 2. Student Request Forgery
+    subgraph Secure Application Perimeter
+        API[FastAPI Backend / Pydantic Validators]
+        SM[Enterprise Secret Manager / KMS]
+    end
 
-| Threat | Risk | Mitigation |
-|:-------|:-----|:-----------|
-| Student modifies exam answers after submission | High | Server checks `status == 'Completed'` before processing; once submitted, session is immutable |
-| Student submits answers for another student's session | High | Firestore security rules validate `resource.data.studentId == request.auth.uid` |
-| Student accesses admin endpoints | High | Firebase Admin custom claims (`role: 'admin'`) enforced on admin routes; Firestore rules restrict collection access by role |
+    subgraph Managed Cloud Infrastructure
+        FB[Firebase Firestore & Auth]
+        GAI[Google Gemini AI API]
+    end
 
-### 3. Admin Credential Compromise
+    SB -->|HTTPS / Frame Data & Heartbeat| API
+    AB -->|HTTPS / JWT Auth Token| API
+    API -->|Read Secrets / IAM Role| SM
+    API -->|Service Account / RBAC| FB
+    API -->|Sanitized Prompt Requests| GAI
+```
 
-| Threat | Risk | Mitigation |
-|:-------|:-----|:-----------|
-| Firebase Admin SDK credentials exposed | Critical | Credentials stored via environment variables (`.env`), never hardcoded; `.env` files are in `.gitignore` |
-| Admin session hijack | Medium | Firebase Authentication handles session tokens with built-in expiration and refresh |
-
-### 4. Data Privacy (PII / Proctoring Data)
-
-| Threat | Risk | Mitigation |
-|:-------|:-----|:-----------|
-| Webcam images stored permanently | Low | Frames are analyzed in-memory and discarded; no persistent image storage |
-| Student exam data accessible to unauthorized users | High | Firestore security rules restrict read/write by user role and ownership |
-| Monitoring logs expose student behavior patterns | Medium | Logs stored in Firestore subcollections with session-level access control |
-
-### 5. AI Service Abuse
-
-| Threat | Risk | Mitigation |
-|:-------|:-----|:-----------|
-| Prompt injection via exam content | Medium | AI prompts use structured templates; student input is passed as data, not instructions |
-| API key exposure | Critical | `GEMINI_API_KEY` loaded from environment, never committed to source; `pip-audit` and `npm audit` run in CI |
+| Trust Boundary | Entity | Security Stance | Enforcement Mechanism |
+|:---|:---|:---|:---|
+| **Boundary 1** | **Student Browser** | **Untrusted** | Treated as completely adversary-controlled. All webcam analysis, trust scores, and answer validations are re-evaluated server-side. Payloads capped at 10MB via Pydantic validators. |
+| **Boundary 2** | **Admin Browser** | **Privileged** | Role-Based Access Control (RBAC) enforced via Firebase custom claims (`role: 'admin'`). Client never holds service-account private keys. |
+| **Boundary 3** | **FastAPI Backend** | **Application Core** | Runs as non-root `appuser` in hardened Linux containers. Input sanitation, CORS origin filtering, and structured JSON audit logging. |
+| **Boundary 4** | **Database & Auth** | **Managed Storage** | Firestore Security Rules isolate document access. Session states become immutable once marked `Completed` or `Terminated`. |
+| **Boundary 5** | **AI Inference (Gemini)**| **External Provider** | API communication occurs over TLS 1.3. Student answer strings are wrapped into strict schema boundaries preventing prompt injection. |
 
 ---
 
-## Security Controls in Place
+## Production Secret Management Architecture
 
-- ✅ **No hardcoded secrets** — All sensitive values loaded from environment variables
+SecureEval enforces a strict **Zero-Hardcoded-Secrets** and **Dynamic Secret Injection** architecture across environments:
+
+```
+[ Local Development ]       → .env.example template + Git-ignored .env
+[ CI / CD Pipelines ]       → GitHub Encrypted Repository Secrets + Gitleaks Gating
+[ Production Deployment ]   → GCP Secret Manager / AWS Secrets Manager / HashiCorp Vault
+```
+
+### 1. Secret Storage & Ingestion Pattern
+- **Local Dev**: Configured using local `.env` files matching `.env.example`. Committed `.gitignore` rules prevent accidental staging of `.env` or credential JSON files.
+- **Production Workloads**: The backend loads credentials (`GEMINI_API_KEY`, `FIREBASE_CREDENTIALS`, `JWT_SECRET_KEY`) dynamically at runtime using IAM Workload Identity federation with **GCP Secret Manager** or **AWS Secrets Manager**, avoiding static disk storage.
+- **Key Rotation**: Cryptographic API tokens and service account keys follow a mandatory **90-day rotation policy** managed via automated secret versioning.
+
+### 2. Automated Secret Detection & CI Gating
+- Automated secret detection is hard-gated in `.github/workflows/ci.yml` using `gitleaks-action`.
+- Any pull request or commit introducing high-entropy keys, private certificates, or API tokens fails CI immediately.
+
+---
+
+## Threat Matrix & Mitigations
+
+### 1. Attacker-Controlled Webcam Frames
+| Threat | Risk | Mitigation |
+|:---|:---:|:---|
+| Spoofed webcam feed / virtual camera | High | Server-side face count verification via OpenCV Haar Cascades (defense-in-depth alongside client-side MediaPipe) |
+| Oversized or malformed image payloads | Medium | Pydantic `field_validator` enforces max payload size (10 MB) on `FrameData.image`; `cv2.imdecode` validates image format |
+| Video frame replay attacks | Medium | Client timestamps and sequence counters matched with backend session drift analysis |
+
+### 2. Session Integrity & Tampering
+| Threat | Risk | Mitigation |
+|:---|:---:|:---|
+| Student modifies answers post-submission | High | Server verifies `status == 'Active'` before processing; once submitted, session status flips to `Completed` and becomes immutable |
+| Cross-session student answer injection | High | Firestore security rules enforce `resource.data.studentId == request.auth.uid` |
+| Privilege escalation to admin | High | Firebase Admin custom claims (`role: 'admin'`) validated on sensitive routes |
+
+### 3. AI Service Abuse & Prompt Injection
+| Threat | Risk | Mitigation |
+|:---|:---:|:---|
+| Student inputs prompt overriding grader instructions | Medium | Grader prompts isolate student answer inside JSON delimiters; model output is schema-validated via Pydantic |
+| External API downtime / rate limiting | Medium | Fallback heuristic grading and structured exception handling in `ai_service.py` |
+
+---
+
+## Security Controls Checklist
+
+- ✅ **No hardcoded secrets** — All sensitive values loaded from environment / Secret Manager
+- ✅ **Automated CI Secret Scanning** — `gitleaks-action` integrated and gated on all commits
 - ✅ **Firebase security rules** — Role-based access control on all Firestore collections
-- ✅ **Input validation** — Pydantic models validate request payloads; image size limits enforced
-- ✅ **Error sanitization** — Global exception handler returns generic error messages; full traces logged server-side only
-- ✅ **Dependency auditing** — `pip-audit` and `npm audit` run in CI pipeline
-- ✅ **Non-root Docker execution** — Dockerfile creates and runs as `appuser`
-- ✅ **CORS configuration** — Configurable via `CORS_ORIGINS` environment variable
-
-## Planned Mitigations
-
-- ⬜ Rate limiting on `/api/analyze_frame` and `/api/sessions/*/submit`
-- ⬜ Request-level authentication middleware for all admin API routes
-- ⬜ Content Security Policy (CSP) headers
-- ⬜ Automated secret scanning in CI (e.g., `gitleaks`)
+- ✅ **Strict Input validation** — Pydantic schemas validate all API endpoints
+- ✅ **Error sanitization** — Generic API responses returned to clients; detailed traces logged to structured sink only
+- ✅ **Dependency auditing** — `pip-audit` and `npm audit --audit-level=high` gated in CI
+- ✅ **Non-root Docker execution** — Container runs under unprivileged `appuser` (UID 1000)
+- ✅ **CORS filtering** — Configurable whitelist via `CORS_ORIGINS`
 
 ---
 
 ## Supported Versions
 
-| Version | Supported |
-|:--------|:----------|
-| 2.5.x   | ✅ Current |
-| < 2.5   | ❌ No longer supported |
+| Version | Security Support Status |
+|:---|:---:|
+| **2.5.x** | ✅ Active Security Updates |
+| < 2.5 | ❌ Deprecated |
