@@ -29,9 +29,29 @@ app = FastAPI(
 )
 
 
-# --- Global Exception Handler ---
-# Catches unhandled exceptions and returns a sanitized response
-# while logging the full stack trace internally.
+from backend.app.errors import SecureEvalError
+
+# --- Global Exception Handlers ---
+@app.exception_handler(SecureEvalError)
+async def secureeval_exception_handler(request: Request, exc: SecureEvalError):
+    logger.warning(
+        "Domain error on %s %s [%s]: %s",
+        request.method,
+        request.url.path,
+        exc.error_code,
+        exc.message,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.error_code,
+            "message": exc.message,
+            "details": exc.details,
+            "path": request.url.path,
+        },
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(
@@ -40,6 +60,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500, content={"detail": "An internal server error occurred. Please try again later."}
     )
+
 
 
 # --- Middleware ---
