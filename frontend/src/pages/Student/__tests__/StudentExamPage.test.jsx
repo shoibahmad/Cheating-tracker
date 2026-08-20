@@ -1,168 +1,144 @@
 /**
- * Tests for StudentExamPage component.
- *
- * Covers: loading state, exam rendering, answer selection,
- * submit flow, and termination handling.
+ * Unit & Integration tests for StudentExamPage component.
  */
 
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StudentExamPage } from '../StudentExamPage';
+import { useExamSession } from '../../../hooks/useExamSession';
 
-const mockSessionData = {
-  id: 'session-001',
-  student_id: 'student-001',
-  student_name: 'Test Student',
-  exam_id: 'exam-001',
-  exam_title: 'CS Midterm',
-  exam_type: 'University',
-  duration_minutes: 30,
-  status: 'Active',
-  trust_score: 100,
-  questions: [
-    {
-      id: 0,
-      text: 'What is Python?',
-      type: 'mcq',
-      options: ['A language', 'A snake', 'A framework', 'A database'],
-      correct_answer: 0,
-      marks: 1,
-    },
-    {
-      id: 1,
-      text: 'Explain Object-Oriented Programming.',
-      type: 'descriptive',
-      marks: 5,
-    },
-  ],
-  created_at: '2026-06-15T10:00:00',
-};
+vi.mock('../../../hooks/useExamSession', () => ({
+  useExamSession: vi.fn(),
+}));
 
-const renderExamPage = (sessionId = 'session-001') => {
-  return render(
-    <MemoryRouter initialEntries={[`/exam/${sessionId}`]}>
-      <Routes>
-        <Route path="/exam/:id" element={<StudentExamPage />} />
-      </Routes>
-    </MemoryRouter>
-  );
-};
+vi.mock('../../../components/Student/ProctoringMonitor', () => ({
+  ProctoringMonitor: () => <div data-testid="proctoring-monitor">Proctoring Monitor</div>,
+}));
+
+vi.mock('../../../components/Student/PreCheckOverlay', () => ({
+  PreCheckOverlay: ({ onStart, examTitle }) => (
+    <div data-testid="precheck-overlay">
+      <h2>PreCheck: {examTitle}</h2>
+      <button onClick={() => onStart(null)}>Start Exam Now</button>
+    </div>
+  ),
+}));
 
 describe('StudentExamPage', () => {
+  const mockQuestions = [
+    {
+      id: 'q1',
+      text: 'What is React?',
+      type: 'mcq',
+      options: ['A library', 'A framework', 'A database', 'An OS'],
+    },
+    {
+      id: 'q2',
+      text: 'Explain Virtual DOM',
+      type: 'descriptive',
+    },
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
-
-    global.fetch = vi.fn((url) => {
-      if (url.includes('/api/sessions/session-001/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              status: 'Active',
-              trust_score: 100,
-              latest_logs: [],
-              termination_reason: null,
-              latest_message: null,
-              is_message_read: false,
-            }),
-        });
-      }
-      if (url.includes('/api/sessions/session-001')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSessionData),
-        });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-    });
-
-    // Mock IP fetch
-    vi.spyOn(global, 'fetch').mockImplementation((url) => {
-      if (url === 'https://api.ipify.org?format=json') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ ip: '192.168.1.1' }),
-        });
-      }
-      if (typeof url === 'string' && url.includes('/api/sessions/session-001/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              status: 'Active',
-              trust_score: 100,
-              latest_logs: [],
-            }),
-        });
-      }
-      if (typeof url === 'string' && url.includes('/api/sessions/session-001')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSessionData),
-        });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-    });
   });
 
-  it('renders without crashing', () => {
-    expect(() => renderExamPage()).not.toThrow();
-  });
-
-  it('fetches session data on mount', async () => {
-    renderExamPage();
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+  it('renders loading state when exam session is loading', () => {
+    useExamSession.mockReturnValue({
+      loading: true,
     });
-  });
 
-  it('handles terminated session', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ...mockSessionData,
-            status: 'Terminated',
-            termination_reason: 'Multiple faces detected',
-          }),
-      })
+    render(
+      <MemoryRouter initialEntries={['/exam/sess-123']}>
+        <Routes>
+          <Route path="/exam/:id" element={<StudentExamPage />} />
+        </Routes>
+      </MemoryRouter>
     );
 
-    renderExamPage();
+    expect(screen.getByText(/INITIALIZING SYSTEM/i)).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+  it('shows pre-check overlay before exam starts', () => {
+    useExamSession.mockReturnValue({
+      loading: false,
+      examTitle: 'JavaScript Assessment',
+      questions: mockQuestions,
+      answers: {},
+      timeLeft: 1800,
+      terminated: false,
+      result: null,
+      handleAnswerChange: vi.fn(),
+      executeSubmit: vi.fn(),
+      handleViolation: vi.fn(),
     });
-  });
 
-  it('handles fetch error gracefully', async () => {
-    global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
-
-    expect(() => renderExamPage()).not.toThrow();
-  });
-
-  it('handles nonexistent session', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve({ detail: 'Session not found' }),
-      })
+    render(
+      <MemoryRouter initialEntries={['/exam/sess-123']}>
+        <Routes>
+          <Route path="/exam/:id" element={<StudentExamPage />} />
+        </Routes>
+      </MemoryRouter>
     );
 
-    renderExamPage('nonexistent-id');
+    expect(screen.getByTestId('precheck-overlay')).toBeInTheDocument();
+    expect(screen.getByText('PreCheck: JavaScript Assessment')).toBeInTheDocument();
+  });
+
+  it('navigates to questions after pre-check passes', async () => {
+    const handleAnswerChange = vi.fn();
+    const executeSubmit = vi.fn();
+
+    useExamSession.mockReturnValue({
+      loading: false,
+      examTitle: 'JavaScript Assessment',
+      questions: mockQuestions,
+      answers: {},
+      timeLeft: 1800,
+      terminated: false,
+      result: null,
+      handleAnswerChange,
+      executeSubmit,
+      handleViolation: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/exam/sess-123']}>
+        <Routes>
+          <Route path="/exam/:id" element={<StudentExamPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const startBtn = screen.getByRole('button', { name: /Start Exam Now/i });
+    fireEvent.click(startBtn);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect(screen.getByText('What is React?')).toBeInTheDocument();
+      expect(screen.getByTestId('proctoring-monitor')).toBeInTheDocument();
     });
+  });
+
+  it('renders terminated screen when session is terminated', () => {
+    useExamSession.mockReturnValue({
+      loading: false,
+      examTitle: 'JavaScript Assessment',
+      terminated: true,
+      terminationReason: 'Multiple unauthorized objects detected',
+      result: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/exam/sess-123']}>
+        <Routes>
+          <Route path="/exam/:id" element={<StudentExamPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Exam Terminated/i)).toBeInTheDocument();
+    expect(screen.getByText(/Multiple unauthorized objects detected/i)).toBeInTheDocument();
   });
 });
