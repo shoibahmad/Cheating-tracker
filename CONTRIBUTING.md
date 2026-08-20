@@ -126,20 +126,34 @@ chore(deps): pin numpy to >=1.26.0,<3.0.0
 
 ---
 
-## Pull Request Process
+## Pull Request Process & Branch Protection
 
-1. **Branch from `main`** using the naming convention:
+1. **Branch Protection:** The `main` branch requires all CI workflow jobs to pass before merge:
+   - `backend-test` (Ruff lint, Mypy typecheck, Pytest >= 75% coverage)
+   - `frontend-test` (ESLint, Vitest >= 70% coverage, Vite production build)
+   - `security-audit` (Gitleaks scan, pip-audit, npm audit)
+
+2. **Branch from `main`** using the naming convention:
    - `feat/description` for features
    - `fix/description` for bug fixes
    - `test/description` for test additions
 
-2. **Write tests** for any new functionality. PRs without tests for new code will not be merged.
-
-3. **Ensure CI passes** — All lint, test, and audit checks must be green.
+3. **Write tests** for any new functionality. PRs without tests for new code will not be merged.
 
 4. **Keep commits small and focused** — One logical change per commit, paired with its tests.
 
 5. **Update documentation** if your change affects the public API or setup process.
+
+---
+
+## Good First Issues for External Contributors
+
+We actively welcome contributions from the community. If you're looking for an impactful first issue, here are curated areas:
+
+- **E2E Testing:** Add Playwright / Cypress browser proctoring integration test flows.
+- **WebSocket Gateway:** Add full-duplex WebSocket channel for sub-second proctoring telemetry.
+- **Accessibility (a11y):** Audit ARIA attributes across student assessment forms and question editors.
+- **Multi-Factor Auth:** Add WebAuthn / FIDO2 biometric authentication for exam entry.
 
 ---
 
@@ -148,15 +162,15 @@ chore(deps): pin numpy to >=1.26.0,<3.0.0
 ### Python
 - Follow PEP 8 (enforced by `ruff`)
 - Max line length: 120 characters
-- Use type hints for function signatures
+- Use type hints for function signatures and verify with `mypy backend/app`
 - Use structured logging (`from backend.app.logging_config import get_logger`)
 - Never use `print()` for logging
 
 ### JavaScript/JSX
 - Follow the ESLint configuration in `eslint.config.js`
 - Use functional components with hooks
-- Keep components focused (< 300 LOC)
-- Use the centralized `API_BASE_URL` from `config.js`
+- Keep components focused (< 200 LOC)
+- Use the centralized `examsService` API layer from `services/examsService.js`
 
 ---
 
@@ -165,6 +179,7 @@ chore(deps): pin numpy to >=1.26.0,<3.0.0
 Please review [SECURITY.md](SECURITY.md) before contributing. Key points:
 
 - **Never** commit API keys, credentials, or secrets
-- **Never** return raw exception details to clients
+- **Never** return raw exception details to clients (use `SecureEvalError` domain exceptions)
 - **Always** validate user input via Pydantic models
-- Report vulnerabilities privately (see SECURITY.md for contact)
+- Report vulnerabilities privately (see [SECURITY.md](SECURITY.md) for contact)
+
