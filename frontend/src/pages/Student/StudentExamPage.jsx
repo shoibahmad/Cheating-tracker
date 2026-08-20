@@ -8,6 +8,7 @@ import { LoadingScreen } from '../../components/Common/LoadingScreen';
 import { db } from '../../firebase';
 import { faceMeshService } from '../../services/FaceMeshService';
 import { objectDetectionService } from '../../services/ObjectDetectionService';
+import { PreCheckOverlay } from '../../components/Student/PreCheckOverlay';
 
 export const StudentExamPage = () => {
     const { id } = useParams();
@@ -23,6 +24,7 @@ export const StudentExamPage = () => {
     const [showSubmitModal, setShowSubmitModal] = useState(false); // Custom Confirm Modal
 
     const [terminationReason, setTerminationReason] = useState("");
+    const [preCheckPassed, setPreCheckPassed] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState(null);
     const [violationReason, setViolationReason] = useState(null); // New state for result display
@@ -344,10 +346,13 @@ export const StudentExamPage = () => {
     useEffect(() => {
         let isActive = true; // Scope-based active flag
 
-        // Camera Guard: Wait for fullscreen and ensure exam is active
-        if (loading || terminated || result || !isFullscreen) {
-            console.log("Camera Effect Guard Triggered:", { loading, terminated, result, isFullscreen });
-            if (streamRef.current) stopCamera();
+        // Camera Guard: Wait for fullscreen and ensure pre-check is passed
+        if (loading || terminated || result || !isFullscreen || !preCheckPassed) {
+            console.log("Camera Effect Guard Triggered:", { loading, terminated, result, isFullscreen, preCheckPassed });
+            // Do NOT stop camera if we are in pre-check (it might be the pre-check stream)
+            if (preCheckPassed && streamRef.current && (loading || terminated || result || !isFullscreen)) {
+                stopCamera();
+            }
             return;
         }
         
@@ -355,12 +360,17 @@ export const StudentExamPage = () => {
 
         const startCamera = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480, facingMode: 'user' },
-                    audio: false
-                });
-
-                streamRef.current = stream; // Save reference
+                // REUSE PRE-CHECK STREAM IF AVAILABLE
+                let stream = streamRef.current;
+                
+                if (!stream) {
+                    console.log("No stream from pre-check, requesting new stream...");
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 640, height: 480, facingMode: 'user' },
+                        audio: false
+                    });
+                    streamRef.current = stream;
+                }
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
@@ -548,25 +558,19 @@ export const StudentExamPage = () => {
 
     // --- Renders ---
 
-    // 1. Fullscreen / Security Check
-    if (!isFullscreen && !terminated && !result && !loading) {
+    // 1. Pre-Check Overlay
+    if (!preCheckPassed && !terminated && !result && !loading) {
         return (
-            <div className="animate-fade-in" style={{
-                position: 'fixed', inset: 0, zIndex: 9999,
-                backgroundColor: 'var(--bg-primary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-            }}>
-                <div className="glass-panel" style={{ padding: '3rem', maxWidth: '500px', textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: '1rem' }}>Secure Exam Environment</h2>
-                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
-                        To proceed, you must enter fullscreen mode. <br />
-                        <b>Note:</b> Exiting fullscreen, switching tabs, or looking away will be flagged as violations.
-                    </p>
-                    <button className="btn btn-primary" onClick={enterFullscreen} style={{ padding: '1rem 2rem' }}>
-                        Enter Fullscreen & Start Exam
-                    </button>
-                </div>
-            </div>
+            <PreCheckOverlay 
+                examTitle={examTitle}
+                onStart={(preCheckStream) => {
+                    if (preCheckStream) {
+                        streamRef.current = preCheckStream;
+                    }
+                    setPreCheckPassed(true);
+                    enterFullscreen();
+                }} 
+            />
         );
     }
 
@@ -626,27 +630,6 @@ export const StudentExamPage = () => {
         );
     }
 
-    // 3. Pre-Exam / Security Check State
-    if (!isFullscreen && !terminated && !loading) {
-        return (
-            <div className="animate-fade-in" style={{
-                position: 'fixed', inset: 0, zIndex: 9999,
-                backgroundColor: 'var(--bg-primary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-            }}>
-                <div className="glass-panel" style={{ padding: '3rem', maxWidth: '500px', textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: '1rem' }}>Secure Exam Environment</h2>
-                    <p style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
-                        To proceed, you must enter fullscreen mode. <br />
-                        <b>Note:</b> Exiting fullscreen, switching tabs, or looking away will be flagged as violations.
-                    </p>
-                    <button className="btn btn-primary" onClick={enterFullscreen} style={{ padding: '1rem 2rem' }}>
-                        Enter Fullscreen & Start Exam
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     // 4. Locked State (Kiosk Violation)
     if (isLocked) {
