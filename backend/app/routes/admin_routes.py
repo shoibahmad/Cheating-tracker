@@ -89,8 +89,8 @@ def export_session_history(format: str = "json", db=Depends(get_firestore_db)):
     sessions = get_session_history(db=db)
 
     if format.lower() == "csv":
-        import io
         import csv
+        import io
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["Session ID", "Student ID", "Student Name", "Exam Title", "Status", "Trust Score", "Score", "Percentage", "Created At"])
