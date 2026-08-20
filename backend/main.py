@@ -74,6 +74,11 @@ app.add_middleware(
 # API Routes
 app.include_router(api_router, prefix="/api")
 
+# Root-level health probe
+from backend.app.routes.health_routes import router as health_router
+
+app.include_router(health_router)
+
 
 # --- Static File Serving ---
 # Serve React static assets (JS, CSS, Images) from the build folder
