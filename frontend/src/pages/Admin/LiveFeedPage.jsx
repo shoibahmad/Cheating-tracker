@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import { Eye, AlertTriangle, Shield, User, XCircle, Search } from 'lucide-react';
 import { LoadingScreen } from '../../components/Common/LoadingScreen';
 import { logger } from '../../utils/logger';
+import { examsService } from '../../services/examsService';
 
 export const LiveFeedPage = () => {
     const [sessions, setSessions] = useState([]);
@@ -14,11 +14,8 @@ export const LiveFeedPage = () => {
     useEffect(() => {
         const fetchSessions = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/sessions`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setSessions(data);
-                }
+                const data = await examsService.getSessions();
+                setSessions(data);
             } catch (err) {
                 logger.error("Error fetching live sessions", err);
             } finally {
@@ -44,15 +41,9 @@ export const LiveFeedPage = () => {
         if (!sessionId) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/terminate`, {
-                method: 'POST'
-            });
-            if (res.ok) {
-                setSessions(prev => prev.filter(s => s.id !== sessionId));
-                toast.success(`Terminated session for ${studentName || 'student'}`);
-            } else {
-                toast.error("Failed to terminate session");
-            }
+            await examsService.terminateSession(sessionId);
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            toast.success(`Terminated session for ${studentName || 'student'}`);
         } catch (err) {
             logger.error("Error terminating session", err);
             toast.error("Failed to terminate session");
@@ -157,8 +148,7 @@ export const LiveFeedPage = () => {
                             <button
                                 onClick={async () => {
                                     try {
-                                        const res = await fetch(`${API_BASE_URL}/api/sessions/${session.id}/logs`);
-                                        const logs = await res.json();
+                                        const logs = await examsService.getSessionLogs(session.id);
                                         setLogsModal({ show: true, logs: logs });
                                     } catch (e) {
                                         logger.error("Error fetching session logs", e);

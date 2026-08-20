@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, UserPlus, Edit, Trash2, Save, X, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../../config';
 import toast from 'react-hot-toast';
 import { ConfirmModal } from '../../components/Common/ConfirmModal';
 import { logger } from '../../utils/logger';
-
+import { examsService } from '../../services/examsService';
 
 export const StudentManagementPage = () => {
     const navigate = useNavigate();
@@ -18,7 +17,6 @@ export const StudentManagementPage = () => {
     // --- Delete Confirmation State ---
     const [isStudentDeleteModalOpen, setIsStudentDeleteModalOpen] = useState(false);
     const [currentStudentIdToDelete, setCurrentStudentIdToDelete] = useState(null);
-
 
     // Form State
     const [formData, setFormData] = useState({
@@ -35,15 +33,8 @@ export const StudentManagementPage = () => {
 
     const fetchStudents = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/students`);
-            if (res.ok) {
-                const data = await res.json();
-                setStudents(data);
-            } else {
-                const text = await res.text();
-                logger.error("Fetch students failed", { status: res.status, text });
-                toast.error("Failed to fetch: " + res.status);
-            }
+            const data = await examsService.getAdminStudents();
+            setStudents(data);
         } catch (err) {
             logger.error("Fetch students exception", err);
             toast.error("Failed to load students: " + err.message);
@@ -84,15 +75,9 @@ export const StudentManagementPage = () => {
         if (!currentStudentIdToDelete) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/students/${currentStudentIdToDelete}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                toast.success("Student deleted");
-                fetchStudents();
-            } else {
-                toast.error("Failed to delete student");
-            }
+            await examsService.deleteAdminStudent(currentStudentIdToDelete);
+            toast.success("Student deleted");
+            fetchStudents();
         } catch (err) {
             logger.error("Error deleting student", err);
             toast.error("Error deleting student");
@@ -105,30 +90,19 @@ export const StudentManagementPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const url = editingStudent
-            ? `${API_BASE_URL}/api/admin/students/${editingStudent.id}`
-            : `${API_BASE_URL}/api/admin/students`;
-
-        const method = editingStudent ? 'PUT' : 'POST';
-
         try {
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-
-            if (res.ok) {
-                toast.success(editingStudent ? "Student updated" : "Student created");
-                setIsModalOpen(false);
-                fetchStudents();
+            if (editingStudent) {
+                await examsService.updateAdminStudent(editingStudent.id, formData);
+                toast.success("Student updated");
             } else {
-                const data = await res.json();
-                toast.error(data.detail || "Operation failed");
+                await examsService.createAdminStudent(formData);
+                toast.success("Student created");
             }
+            setIsModalOpen(false);
+            fetchStudents();
         } catch (err) {
             logger.error("Error submitting student form", err);
-            toast.error("Error submitting form");
+            toast.error(err.message || "Error submitting form");
         }
     };
 
