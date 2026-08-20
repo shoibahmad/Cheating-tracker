@@ -1,0 +1,54 @@
+# Docker Compose for SecureEval — Full local development stack
+#
+# Usage:
+#   docker compose up           — Start all services
+#   docker compose up backend   — Start backend only
+#   docker compose down         — Stop all services
+#
+# Prerequisites:
+#   - Copy backend/.env.example to backend/.env and fill in your keys
+#   - Copy frontend/.env.example to frontend/.env and fill in your keys
+
+version: "3.9"
+
+services:
+  # --- Backend (FastAPI + Uvicorn) ---
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    environment:
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=text
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    volumes:
+      - ./backend:/app/backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # --- Frontend (Vite Dev Server) ---
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    env_file:
+      - frontend/.env
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  frontend_node_modules:

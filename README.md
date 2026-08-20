@@ -1,10 +1,12 @@
 # SecureEval — AI-Powered Exam Proctoring Platform
 
+![CI Pipeline](https://github.com/shoibahmad/Cheating-tracker/actions/workflows/ci.yml/badge.svg)
 ![Status](https://img.shields.io/badge/Status-Production-success)
 ![Version](https://img.shields.io/badge/Version-2.5.0-blue)
 ![Frontend](https://img.shields.io/badge/Frontend-React_19-teal)
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-darkgreen)
 ![AI](https://img.shields.io/badge/AI-Google_Gemini-orange)
+![Tests](https://img.shields.io/badge/Tests-pytest_+_vitest-green)
 
 **SecureEval** is a comprehensive, enterprise-grade AI-powered online exam proctoring system. It combines real-time computer vision, automated AI grading, and a high-performance administration dashboard to ensure academic integrity in remote assessments.
 
@@ -28,7 +30,7 @@ graph TD
     end
     
     subgraph Services [AI & ML]
-        B -->|OCR/Grading/Consistency| D[Google Gemini 1.5 Flash]
+        B -->|OCR/Grading/Consistency| D[Google Gemini 2.5 Flash]
         A -->|Proctoring (Face/Gaze)| E
         A -->|Object Detection (Smartphones)| I[TFJS COCO-SSD]
         B -->|Server-side Verification| H[OpenCV Haar Cascades]
@@ -47,6 +49,7 @@ graph TD
 | :--- | :--- | :--- |
 | **Framework** | [React 19](https://react.dev/) | Component-based UI with fast reconciliation. |
 | **Build Tool** | [Vite 7](https://vitejs.dev/) | Ultra-fast HMR and optimized production builds. |
+| **Testing** | [Vitest](https://vitest.dev/) + [React Testing Library](https://testing-library.com/) | Component and integration testing. |
 | **Computer Vision** | [MediaPipe Face Mesh](https://developers.google.com/mediapipe) | Real-time tracking of 478 3D facial landmarks. |
 | **State/Routing** | React Context + Router 7 | Role-aware navigation and global authentication. |
 | **Styling** | Vanilla CSS (Glassmorphism) | Premium, responsive, and translucent UI design. |
@@ -57,6 +60,8 @@ graph TD
 | :--- | :--- | :--- |
 | **Framework** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance asynchronous Python framework. |
 | **Web Server** | [Uvicorn](https://www.uvicorn.org/) | Lightning-fast ASGI server. |
+| **Testing** | [pytest](https://pytest.org/) + [pytest-cov](https://pytest-cov.readthedocs.io/) | Unit and integration testing with coverage. |
+| **Linting** | [Ruff](https://docs.astral.sh/ruff/) | Fast Python linter and formatter. |
 | **AI LLM** | [Google Generative AI](https://deepmind.google/technologies/gemini/) | OCR, Automated Grading, and Style Consistency Analysis. |
 | **Object Detection** | [TensorFlow.js](https://www.tensorflow.org/js) | Real-time prohibited item detection (books, phones). |
 | **Proctoring** | [OpenCV](https://opencv.org/) | Server-side face count verification. |
@@ -135,7 +140,7 @@ The `FaceMeshService` processes webcam frames locally to detect cheating.
     - `count == 0`: `NO_FACE` status (Immediate termination).
     - `count > 1`: `MULTIPLE_FACES` status (Immediate termination).
 
-### 2. Generative AI Pipeline (Gemini 1.5 Flash)
+### 2. Generative AI Pipeline (Gemini 2.5 Flash)
 - **OCR Engine**: Extracts structured JSON from uploaded exam papers (images/PDFs).
   - *Prompt*: *"Extract questions... return JSON with 'questions' array including text, options, and correct answers."*
 - **Auto-Grading**: Grades descriptive answers by comparing semantic meaning against expected keywords.
@@ -149,10 +154,6 @@ The `FaceMeshService` processes webcam frames locally to detect cheating.
 
 ---
 
-
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -162,28 +163,107 @@ The `FaceMeshService` processes webcam frames locally to detect cheating.
 - **Gemini API Key**: Obtain from [Google AI Studio](https://aistudio.google.com/).
 
 ### Local Installation
+
 1. **Clone the Repo**:
    ```bash
    git clone https://github.com/shoibahmad/Cheating-tracker.git
    cd Cheating-tracker
    ```
-2. **Backend Setup**:
+
+2. **Configure Environment Variables**:
    ```bash
-   cd backend
-   pip install -r requirements.txt
-   # Configure .env with GEMINI_API_KEY and FIREBASE_CREDENTIALS
-   uvicorn main:app --reload
+   # Backend
+   cp backend/.env.example backend/.env
+   # Edit backend/.env with your GEMINI_API_KEY and FIREBASE_CREDENTIALS
+   
+   # Frontend
+   cp frontend/.env.example frontend/.env
+   # Edit frontend/.env with your VITE_FIREBASE_API_KEY
    ```
-3. **Frontend Setup**:
+
+3. **Backend Setup**:
+   ```bash
+   pip install -r requirements.txt
+   python -m uvicorn backend.main:app --reload
+   ```
+
+4. **Frontend Setup**:
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
 
+### Using Docker Compose
+
+```bash
+# Copy and configure env files first (step 2 above)
+docker compose up
+```
+
+The backend will be available at `http://localhost:8000` and the frontend at `http://localhost:5173`.
+
+---
+
+## 🧪 Running Tests
+
+### Backend
+```bash
+# Install dev dependencies
+pip install -r backend/requirements-dev.txt
+
+# Run all tests with coverage
+pytest backend/tests/ -v --cov=backend/app --cov-report=term-missing
+
+# Run specific test file
+pytest backend/tests/test_sessions.py -v
+```
+
+### Frontend
+```bash
+cd frontend
+
+# Run all tests
+npm run test
+
+# Run in watch mode
+npm run test:watch
+
+# Run with coverage
+npm run test:coverage
+```
+
+### Linting
+```bash
+# Python
+pip install ruff
+ruff check backend/
+
+# JavaScript
+cd frontend && npm run lint
+```
+
 ---
 
 ## 🛡️ Security & Integrity
+
 - **Restricted Access**: Mobile devices and small screens are blocked from taking exams.
 - **Anti-Switching**: Tab switching or minimizing the browser triggers an immediate violation log and trust score penalty.
 - **Role Isolation**: Admin APIs are protected using Firebase Admin custom claims, ensuring students cannot access monitoring data.
+- **Error Sanitization**: Internal errors are logged server-side; only generic messages are returned to clients.
+- **Input Validation**: All API endpoints validate input via Pydantic models with size limits.
+- **Dependency Auditing**: `pip-audit` and `npm audit` are enforced in the CI pipeline.
+
+For the full security policy and threat model, see [SECURITY.md](SECURITY.md).
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, commit conventions, and PR guidelines.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
