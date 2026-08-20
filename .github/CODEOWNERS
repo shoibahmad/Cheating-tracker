@@ -1,0 +1,15 @@
+# Code Owners for SecureEval
+
+# Global owners
+* @shoibahmad
+
+# Backend
+/backend/ @shoibahmad
+/requirements-lock.txt @shoibahmad
+
+# Frontend
+/frontend/ @shoibahmad
+
+# Security & CI
+/SECURITY.md @shoibahmad
+/.github/ @shoibahmad
