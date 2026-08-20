@@ -7,6 +7,7 @@ semantic consistency analysis, and question generation.
 
 import json
 import os
+import re
 
 import google.generativeai as genai
 import grpc
@@ -61,9 +62,12 @@ def _parse_ai_json(text: str) -> dict:
         json.JSONDecodeError: If the text cannot be parsed as JSON.
     """
     cleaned = text.strip()
-    if cleaned.startswith("```json"):
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+    if match:
+        cleaned = match.group(1).strip()
+    elif cleaned.startswith("```json"):
         cleaned = cleaned[7:]
-    if cleaned.startswith("```"):
+    elif cleaned.startswith("```"):
         cleaned = cleaned[3:]
     if cleaned.endswith("```"):
         cleaned = cleaned[:-3]

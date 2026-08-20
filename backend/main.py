@@ -81,6 +81,9 @@ async def log_requests(request: Request, call_next):
     return response
 
 
+from backend.app.middleware.rate_limit import RateLimitMiddleware
+from backend.app.middleware.security_headers import SecurityHeadersMiddleware
+
 # CORS config — restrict origins via environment variable for production
 allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 
@@ -91,6 +94,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware, max_requests=120, window_seconds=60)
 
 # API Routes
 app.include_router(api_router, prefix="/api")
