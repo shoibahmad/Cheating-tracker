@@ -1,694 +1,226 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Admin Dashboard Page.
+ * Displays overall platform metrics, Recharts visualizers, and session history management.
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from '../../firebase';
-import { ConfirmModal } from '../../components/Common/ConfirmModal';
-
+import { DashboardCharts } from '../../components/Dashboard/DashboardCharts';
+import { SessionHistoryTable } from '../../components/Dashboard/SessionHistoryTable';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell
-} from 'recharts';
-import {
-    Users,
-    ShieldAlert,
-    FileText,
-    TrendingUp,
-    Activity,
-    CheckCircle,
-    Edit,
-    Trash2,
-    MessageSquare,
-    Zap,
-    X
-} from 'lucide-react';
+  calculateDashboardStats,
+  computeStatusChartData,
+  computePerformanceDistribution,
+} from '../../utils/dashboardStats';
+import { Users, ShieldAlert, FileText, Activity, Zap, MessageSquare } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 export const AdminDashboard = () => {
-    // --- State & UI Logic ---
-    const [sessions, setSessions] = useState([]);
-    const [isSessionDeleteModalOpen, setIsSessionDeleteModalOpen] = useState(false);
-    const [currentSessionIdToDelete, setCurrentSessionIdToDelete] = useState(null);
-    const [stats, setStats] = useState({
-        active: 0,
-        flagged: 0,
-        total_students: 0,
-        avg_score: 0,
-        total_exams: 0
-    });
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [messageModalSessionId, setMessageModalSessionId] = useState(null);
+  const [adminMessage, setAdminMessage] = useState('');
 
-    const COLORS = ['#10b981', '#f43f5e', '#6366f1']; // Green, Red, Indigo
-    const [chartData, setChartData] = useState([]); // Real chart data
-    const [performanceData, setPerformanceData] = useState([]);
+  // --- Fetch Session Data ---
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/admin/exams/history`);
+      if (!res.ok) throw new Error('Failed to load session history');
+      const data = await res.json();
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+      toast.error('Failed to load dashboard data');
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    console.log("Admin Dashboard Logic: Initializing with", { isSessionDeleteModalOpen });
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    const loadData = async () => {
-        try {
-            // Fetch stats from Backend
-            const res = await fetch(`${API_BASE_URL}/api/admin/exams/history`);
-            if (!res.ok) throw new Error("Failed to fetch sessions");
-            const sessionsList = await res.json();
+  // --- Session Deletion ---
+  const handleDeleteSession = async (sessionId) => {
+    if (!window.confirm('Are you sure you want to delete this session record?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      toast.success('Session deleted');
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      toast.error('Failed to delete session');
+    }
+  };
 
-            // Fetch Students
-            const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
-            const totalStudents = usersSnapshot.size;
+  // --- Send Message to Active Session ---
+  const handleSendMessage = async () => {
+    if (!adminMessage.trim() || !messageModalSessionId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions/${messageModalSessionId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: adminMessage }),
+      });
+      if (!res.ok) throw new Error('Message sending failed');
+      toast.success('Message broadcast to student');
+      setAdminMessage('');
+      setMessageModalSessionId(null);
+    } catch (err) {
+      console.error('Error sending message:', err);
+      toast.error('Failed to send message');
+    }
+  };
 
-            // --- Process Data for Stats (Prioritized for Distribution) ---
-            let activeCount = 0;
-            let flaggedCount = 0;
-            let completedCount = 0;
+  // --- Compute Stats and Chart Series ---
+  const stats = calculateDashboardStats(sessions);
+  const statusChartData = computeStatusChartData(sessions);
+  const performanceData = computePerformanceDistribution(sessions);
 
-            sessionsList.forEach(s => {
-                // Robust check: Status is Terminated/Flagged OR latest_log exists (and is not just whitespace)
-                const hasLog = s.latest_log && String(s.latest_log).trim().length > 0;
-                const isFlagged = s.status === 'Terminated' || s.status === 'Flagged' || hasLog;
+  return (
+    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+      <Toaster position="top-right" />
 
-                if (isFlagged) {
-                    flaggedCount++;
-                } else if (s.status === 'Completed') {
-                    completedCount++;
-                } else if (s.status === 'Active') {
-                    activeCount++;
-                }
-            });
-
-            // Calculate Average Trust Score (from ALL sessions with trust scores)
-            const sessionsWithTrust = sessionsList.filter(s => s.trust_score !== undefined);
-            const avgTrustScore = sessionsWithTrust.length > 0
-                ? Math.round(sessionsWithTrust.reduce((acc, curr) => acc + (Number(curr.trust_score) || 0), 0) / sessionsWithTrust.length)
-                : 100;
-
-            const totalExams = sessionsList.length;
-
-            setSessions(sessionsList);
-            setStats({
-                active: activeCount,
-                flagged: flaggedCount,
-                completed: completedCount,
-                total_students: totalStudents,
-                avg_score: avgTrustScore, // Fix: Use Trust Score for the card
-                total_exams: totalExams
-            });
-
-            // --- Process Data for Weekly Activity Chart ---
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const today = new Date();
-            const last7Days = [];
-
-            // Initialize last 7 days buckets
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(today);
-                d.setDate(today.getDate() - i);
-                const dayName = days[d.getDay()];
-                // We'll use local date string for robust comparison 'YYYY-MM-DD'
-                const dateKey = d.toISOString().split('T')[0];
-                last7Days.push({
-                    name: dayName,
-                    dateKey: dateKey,
-                    exams: 0,
-                    alerts: 0
-                });
-            }
-
-            // Fill buckets
-            sessionsList.forEach(session => {
-                if (!session.created_at) return;
-                // session.created_at is ISO string
-                const sessionDate = session.created_at.split('T')[0];
-
-                const dayBucket = last7Days.find(d => d.dateKey === sessionDate);
-                if (dayBucket) {
-                    dayBucket.exams += 1;
-                    if (session.status === 'Flagged' || session.status === 'Terminated' || session.latest_log) {
-                        dayBucket.alerts += 1;
-                    }
-                }
-            });
-
-            setChartData(last7Days);
-
-            // --- Process Subject Performance ---
-            const performanceMap = {};
-            sessionsList.forEach(s => {
-                // Include sessions if they have a percentage (or score)
-                // Prefer 'percentage' if available (added to backend), else use 'score' (which might be raw)
-                const valToUse = s.percentage !== undefined ? s.percentage : s.score;
-
-                if ((s.status === 'Completed' || s.status === 'Flagged' || s.status === 'Terminated') && valToUse !== undefined && valToUse !== null) {
-                    const scoreVal = Number(valToUse);
-                    if (!isNaN(scoreVal)) {
-                        const subject = s.exam_type || 'Unknown';
-                        if (!performanceMap[subject]) {
-                            performanceMap[subject] = { name: subject, totalScore: 0, count: 0 };
-                        }
-                        performanceMap[subject].totalScore += scoreVal;
-                        performanceMap[subject].count += 1;
-                    }
-                }
-            });
-
-            const performanceData = Object.values(performanceMap).map(item => ({
-                name: item.name,
-                avgScore: Math.round(item.totalScore / item.count)
-            }));
-            setPerformanceData(performanceData);
-
-        } catch (err) {
-            console.error("Error loading dashboard data:", err);
-            toast.error("Failed to load dashboard data");
-        }
-    };
-
-    useEffect(() => {
-        loadData();
-        const interval = setInterval(loadData, 10000); // Refresh every 10 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const handleDeleteClick = (id) => {
-        setCurrentSessionIdToDelete(id);
-        setIsSessionDeleteModalOpen(true);
-    };
-
-    const executeDelete = async () => {
-        if (!currentSessionIdToDelete) return;
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/sessions/${currentSessionIdToDelete}`, {
-                method: 'DELETE'
-            });
-
-            if (res.ok) {
-                toast.success("Session deleted successfully");
-                loadData();
-            } else {
-                toast.error("Failed to delete session");
-            }
-        } catch (err) {
-            console.error("Error deleting session:", err);
-            toast.error("Error deleting session");
-        } finally {
-            setIsSessionDeleteModalOpen(false);
-            setCurrentSessionIdToDelete(null);
-        }
-    };
-
-    const statusData = [
-        { name: 'Active', value: stats.active },
-        { name: 'Flagged', value: stats.flagged },
-        { name: 'Completed', value: stats.completed || 0 }
-    ];
-
-    // --- Message Logic ---
-    const [messageSessionId, setMessageSessionId] = useState(null);
-    const [messageText, setMessageText] = useState("");
-
-    const handleSendMessage = async () => {
-        if (!messageText.trim()) return;
-        try {
-            await fetch(`${API_BASE_URL}/api/sessions/${messageSessionId}/message`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: messageText })
-            });
-            toast.success("Message sent to student");
-            setMessageSessionId(null);
-            setMessageText("");
-        } catch (err) {
-            toast.error("Failed to send message");
-        }
-    };
-
-    // --- PDF Export Logic ---
-    const exportPDF = () => {
-        const doc = new jsPDF();
-
-        doc.setFontSize(18);
-        doc.text("Exam Proctoring Report", 14, 22);
-
-        doc.setFontSize(11);
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
-        doc.text(`Total Sessions: ${sessions.length}`, 14, 38);
-
-        const tableColumn = ["ID", "Student", "Exam", "Status", "Score", "Percentage", "Trust Score"];
-        const tableRows = [];
-
-        sessions.forEach(session => {
-            const sessionData = [
-                (session.id || "").substring(0, 8),
-                session.student_name || "Unknown",
-                session.exam_type || "N/A",
-                session.status,
-                `${session.score || 0} / ${session.total || '?'}`,
-                `${session.percentage || ((session.score && session.total) ? Math.round((session.score / session.total) * 100) : 0)}%`,
-                `${session.trust_score || 0}%`
-            ];
-            tableRows.push(sessionData);
-        });
-
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 45,
-        });
-
-        doc.save(`exam_report_${new Date().toISOString().split('T')[0]}.pdf`);
-    };
-
-    const exportCSV = () => {
-        if (!sessions.length) return;
-
-        const headers = ["Session ID", "Candidate", "Exam Type", "Status", "Score", "Trust Score", "Latest Alert", "Date"];
-        const csvRows = [headers.join(",")];
-
-        sessions.forEach(s => {
-            const row = [
-                s.id,
-                `"${s.student_name || s.studentName || 'Unknown'}"`,
-                `"${s.exam_type || ''}"`,
-                s.status,
-                s.score || 0,
-                s.trust_score || 100,
-                `"${s.latest_log || ''}"`,
-                s.created_at || ''
-            ];
-            csvRows.push(row.join(","));
-        });
-
-        const blob = new Blob([csvRows.join("\n")], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `exam_report_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    };
-
-    return (
-        <div className="container" style={{ paddingBottom: '3rem' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-                <div>
-                    <h2 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>Admin Dashboard</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>Overview of system performance and exam integrity</p>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <Link to="/admin/create-paper" className="btn btn-primary" style={{ gap: '0.5rem' }}>
-                        <FileText size={18} /> Create Paper
-                    </Link>
-                    <Link to="/admin/assign-exam" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
-                        <Users size={18} /> Assign Exam
-                    </Link>
-                    <Link to="/admin/students" className="btn btn-secondary" style={{ gap: '0.5rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                        <Edit size={18} /> Manage Students
-                    </Link>
-                </div>
-            </div>
-
-
-            {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '2.5rem' }}>
-                <StatCard
-                    label="Total Sessions"
-                    value={stats.total_exams}
-                    icon={Activity}
-                    color="var(--accent-primary)"
-                    bg="rgba(99, 102, 241, 0.1)"
-                />
-                <StatCard
-                    label="Active Exams"
-                    value={stats.active}
-                    icon={TrendingUp}
-                    color="var(--accent-success)"
-                    bg="rgba(16, 185, 129, 0.1)"
-                />
-                <StatCard
-                    label="Trust Score Avg"
-                    value={`${stats.avg_score}%`}
-                    icon={CheckCircle}
-                    color="#8b5cf6"
-                    bg="rgba(139, 92, 246, 0.1)"
-                />
-                <StatCard
-                    label="Flagged Incidents"
-                    value={stats.flagged}
-                    icon={ShieldAlert}
-                    color="var(--accent-alert)"
-                    bg="rgba(244, 63, 94, 0.1)"
-                />
-            </div>
-
-            {/* Charts Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
-                {/* Activity Chart */}
-                <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '350px' }}>
-                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Weekly Exam Activity</h3>
-                    <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                            <XAxis dataKey="name" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} />
-                            <YAxis stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} />
-                            <Tooltip
-                                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
-                                itemStyle={{ color: 'var(--text-primary)' }}
-                            />
-                            <Bar dataKey="exams" name="Exams Conducted" fill="var(--accent-primary)" radius={[4, 4, 0, 0]} barSize={20} />
-                            <Bar dataKey="alerts" name="Alerts Triggered" fill="var(--accent-alert)" radius={[4, 4, 0, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Subject Performance Chart */}
-                <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '350px' }}>
-                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Subject Performance (Avg Score)</h3>
-                    <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={performanceData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
-                            <XAxis type="number" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                            <YAxis dataKey="name" type="category" stroke="#fff" tick={{ fill: '#fff' }} axisLine={false} tickLine={false} width={100} />
-                            <Tooltip
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff' }}
-                                itemStyle={{ color: '#fff' }}
-                            />
-                            <Bar dataKey="avgScore" name="Average Score" fill="var(--accent-success)" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* Status Distribution (Full Width) */}
-            <div style={{ marginBottom: '2.5rem' }}>
-                <div className="glass-panel" style={{ padding: '1.5rem', minHeight: '300px' }}>
-                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Overall Status Distribution</h3>
-                    <div style={{ height: '250px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={statusData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {statusData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#fff' }}
-                                    itemStyle={{ color: '#fff' }}
-                                />
-                                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#fff' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            {/* Suspicious Activity Feed */}
-            <div style={{ marginBottom: '2.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-alert)' }}>
-                    <ShieldAlert size={20} /> Suspicious Activity & At-Risk Sessions
-                </h3>
-                <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
-                    {sessions.filter(s => (s.trust_score !== undefined && s.trust_score < 70) || s.status === 'Flagged' || s.status === 'Terminated' || !!s.latest_log).length > 0 ? (
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                            {sessions
-                                .filter(s => (s.trust_score !== undefined && s.trust_score < 70) || s.status === 'Flagged' || s.status === 'Terminated' || !!s.latest_log)
-                                .map(session => (
-                                    <div key={session.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(244, 63, 94, 0.1)', color: 'var(--accent-alert)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <ShieldAlert size={16} />
-                                            </div>
-                                            <div>
-                                                <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{session.student_name || 'Unknown Student'}</p>
-                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ID: {session.id.substring(0, 8)}...</p>
-                                            </div>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <span style={{
-                                                display: 'inline-block',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                background: 'rgba(244, 63, 94, 0.1)',
-                                                color: 'var(--accent-alert)',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 'bold',
-                                                marginBottom: '0.25rem'
-                                            }}>
-                                                Trust Score: {session.trust_score !== undefined ? session.trust_score : 100}%
-                                            </span>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                {session.latest_log || (session.status === 'Terminated' ? 'Exam Terminated' : 'Flagged by System')}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                        </div>
-                    ) : (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            <CheckCircle size={32} style={{ color: 'var(--accent-success)', marginBottom: '0.5rem', opacity: 0.5 }} />
-                            <p>No suspicious activity detected.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Recent Sessions Table */}
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h3 style={{ fontSize: '1.1rem' }}>Recent Sessions</h3>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <button onClick={exportCSV} className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileText size={16} /> Export CSV
-                        </button>
-                        <button onClick={exportPDF} className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileText size={16} /> Export PDF
-                        </button>
-                        <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.4rem 1rem' }}>View All</button>
-                    </div>
-                </div>
-
-                {sessions.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                        <p>No active sessions found.</p>
-                    </div>
-                ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Session ID</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Candidate</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Exam Type</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Status</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Score</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Percentage</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Trust Score</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Latest Alert</th>
-                                    <th style={{ padding: '1rem', fontWeight: 500 }}>Actions</th>
-
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sessions.map(session => (
-                                    <tr key={session.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} className="table-row">
-                                        <td style={{ padding: '1rem', fontFamily: 'monospace', opacity: 0.7 }}>
-                                            {(session.id || "").toString().substring(0, 8)}...
-                                        </td>
-                                        <td style={{ padding: '1rem', fontWeight: 500 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                    {(session.student_name || session.studentName || '?').charAt(0)}
-                                                </div>
-                                                {session.student_name || session.studentName || 'Unknown'}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '1rem', opacity: 0.8 }}>{session.exam_type}</td>
-                                        <td style={{ padding: '1rem' }}>
-                                            <span style={{
-                                                padding: '0.25rem 0.75rem',
-                                                borderRadius: '20px',
-                                                background: session.status === 'Active' ? 'rgba(16, 185, 129, 0.15)' : session.status === 'Flagged' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                                                color: session.status === 'Active' ? 'var(--accent-success)' : session.status === 'Flagged' ? 'var(--accent-alert)' : 'var(--accent-primary)',
-                                                fontSize: '0.8rem',
-                                                fontWeight: 600,
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.4rem'
-                                            }}>
-                                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
-                                                {session.status}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>
-                                            {session.score !== undefined ? `${session.score} / ${session.total || '?'}` : 'N/A'}
-                                        </td>
-                                        <td style={{ padding: '1rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                                            {session.percentage !== undefined ? `${session.percentage}%` : (
-                                                (session.score && session.total) ? Math.round((session.score / session.total) * 100) + '%' : 'N/A'
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '1rem' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', width: '80px' }}>
-                                                    <div style={{
-                                                        width: `${session.trust_score !== undefined ? session.trust_score : 100}%`,
-                                                        height: '100%',
-                                                        borderRadius: '3px',
-                                                        background: (session.latest_log || session.status === 'Flagged' || session.status === 'Terminated')
-                                                            ? 'var(--accent-alert)'
-                                                            : (session.trust_score !== undefined ? session.trust_score : 100) > 80 ? 'var(--accent-success)' : (session.trust_score || 100) > 50 ? 'var(--accent-warning)' : 'var(--accent-alert)'
-                                                    }} />
-                                                </div>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{session.trust_score !== undefined ? session.trust_score : 100}%</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '1rem', maxWidth: '200px' }}>
-                                            {session.latest_log ? (
-                                                <div style={{
-                                                    fontSize: '0.85rem',
-                                                    color: 'var(--accent-alert)',
-                                                    background: 'rgba(244, 63, 94, 0.1)',
-                                                    padding: '0.25rem 0.5rem',
-                                                    borderRadius: '4px',
-                                                    display: 'inline-block',
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    maxWidth: '100%'
-                                                }} title={session.latest_log}>
-                                                    ⚠ {session.latest_log}
-                                                </div>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                                            <button
-                                                onClick={() => {
-                                                    setMessageSessionId(session.id);
-                                                    setMessageText("");
-                                                }}
-                                                className="btn btn-secondary"
-                                                style={{ padding: '0.4rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                title="Send Message"
-                                            >
-                                                <MessageSquare size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteClick(session.id)}
-                                                className="btn btn-secondary"
-                                                style={{ padding: '0.4rem', color: 'var(--accent-alert)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                title="Delete Session"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Message Modal */}
-            {messageSessionId && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 10000,
-                    backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div className="glass-panel" style={{ width: '400px', padding: '2rem', position: 'relative' }}>
-                        <button
-                            onClick={() => setMessageSessionId(null)}
-                            style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                        >
-                            <X size={20} />
-                        </button>
-
-                        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <MessageSquare size={20} color="var(--accent-primary)" />
-                            Send Message
-                        </h3>
-
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Message to Student</label>
-                            <textarea
-                                value={messageText}
-                                onChange={(e) => setMessageText(e.target.value)}
-                                placeholder="e.g., Please adjust your camera angle..."
-                                style={{
-                                    width: '100%', padding: '0.75rem', borderRadius: '8px',
-                                    backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
-                                    color: '#fff', minHeight: '100px', resize: 'vertical'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setMessageSessionId(null)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleSendMessage}>Send Message</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <ConfirmModal
-                isOpen={isSessionDeleteModalOpen}
-                title="Delete Session?"
-                message="Are you sure you want to delete this session? This action cannot be undone and all data for this session will be lost."
-                onConfirm={executeDelete}
-                onCancel={() => setIsSessionDeleteModalOpen(false)}
-                confirmText="Delete Session"
-                type="danger"
-            />
-        </div>
-    );
-};
-
-const StatCard = ({ label, value, icon: Icon, color, bg }) => (
-    <div className="glass-card" style={{
-        padding: '1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        border: '1px solid var(--glass-border)',
-        borderRadius: '12px',
-        background: 'var(--bg-secondary)'
-    }}>
-        <div style={{
-            width: '48px', height: '48px',
-            borderRadius: '12px',
-            background: bg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: color
-        }}>
-            <Icon size={24} />
-        </div>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.2 }}>{value}</div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{label}</div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: 0 }}>Proctoring Command Center</h1>
+          <p style={{ color: 'var(--text-secondary)', margin: '0.25rem 0 0', fontSize: '0.9rem' }}>
+            Real-time monitoring analytics and examination logs
+          </p>
         </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <Link to="/admin/create-paper" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={16} /> Create Exam
+          </Link>
+          <Link to="/admin/live-feed" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Zap size={16} color="#eab308" /> Live Feeds
+          </Link>
+        </div>
+      </div>
+
+      {/* 4 Stat KPI Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '1.25rem',
+          marginBottom: '2rem',
+        }}
+      >
+        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Active Sessions</span>
+            <Activity size={20} color="#3b82f6" />
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', color: '#60a5fa' }}>
+            {stats.active}
+          </div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Flagged / Terminated</span>
+            <ShieldAlert size={20} color="#ef4444" />
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', color: '#f87171' }}>
+            {stats.flagged + stats.terminated}
+          </div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Total Candidates</span>
+            <Users size={20} color="#10b981" />
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', color: '#34d399' }}>
+            {stats.total_students}
+          </div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Avg Trust Score</span>
+            <Zap size={20} color="#a855f7" />
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', color: '#c084fc' }}>
+            {stats.avg_trust}%
+          </div>
+        </div>
+      </div>
+
+      {/* Analytics Charts */}
+      <DashboardCharts statusData={statusChartData} performanceData={performanceData} />
+
+      {/* Session History Table */}
+      <div style={{ marginTop: '2rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Recent Examination Sessions</h2>
+        <SessionHistoryTable
+          sessions={sessions}
+          onDeleteSession={handleDeleteSession}
+          onOpenMessageModal={(id) => setMessageModalSessionId(id)}
+        />
+      </div>
+
+      {/* Admin Message Modal */}
+      {messageModalSessionId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+        >
+          <div className="glass-panel" style={{ padding: '2rem', maxWidth: '450px', width: '100%', borderRadius: '1rem' }}>
+            <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <MessageSquare size={20} /> Send Proctor Warning
+            </h3>
+            <textarea
+              rows={4}
+              placeholder="Type message to display on candidate's screen..."
+              value={adminMessage}
+              onChange={(e) => setAdminMessage(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff',
+                marginBottom: '1rem',
+                resize: 'vertical',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setMessageModalSessionId(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleSendMessage}>
+                Broadcast Message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-);
+  );
+};
