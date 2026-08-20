@@ -41,6 +41,14 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 
+[tool.mypy]
+python_version = "3.11"
+files = ["backend/app"]
+ignore_missing_imports = true
+warn_unused_configs = true
+check_untyped_defs = true
+strict_optional = true
+
 [project]
 name = "secureeval"
 version = "2.5.0"

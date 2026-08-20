@@ -300,7 +300,7 @@ def evaluate_exam_submission(questions: list, student_answers: dict) -> dict:
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     results = {}
-    total_score = 0
+    total_score: float = 0.0
     total_questions = len(questions)
 
     # Separate Descriptive Questions for AI Batch Processing

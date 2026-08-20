@@ -21,8 +21,11 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Initialize face detection cascade
+face_cascade: cv2.CascadeClassifier | None = None
 try:
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    cv2_data = getattr(cv2, "data", None)
+    haarcascade_path = getattr(cv2_data, "haarcascades", "") + "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(haarcascade_path)
 except Exception:
     face_cascade = None
     logger.warning("Haarcascade not found — face detection will be unavailable")

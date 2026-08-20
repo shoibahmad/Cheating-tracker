@@ -16,6 +16,8 @@ elif os.getenv("FIREBASE_CREDENTIALS"):
 
     # Parse JSON from environment variable
     cred_str = os.getenv("FIREBASE_CREDENTIALS")
+    if not cred_str:
+        raise ValueError("FIREBASE_CREDENTIALS environment variable is empty.")
     try:
         cred_dict = json.loads(cred_str)
     except json.JSONDecodeError:

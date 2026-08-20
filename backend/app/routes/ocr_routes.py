@@ -54,7 +54,7 @@ async def upload_file(file: UploadFile = File(...)):
             }
 
         # Use Gemini AI for extraction
-        result = extract_exam_and_insights(contents, file.content_type)
+        result = extract_exam_and_insights(contents, file.content_type or "image/png")
 
         if "error" in result:
             return {"status": "error", "message": result["error"]}

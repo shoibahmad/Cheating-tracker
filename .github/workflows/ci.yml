@@ -40,6 +40,9 @@ jobs:
       - name: Lint with Ruff
         run: ruff check backend/ --config pyproject.toml
 
+      - name: Typecheck with Mypy
+        run: mypy backend/app --config-file pyproject.toml
+
       - name: Run backend tests with coverage gate (>= 75%)
         env:
           GEMINI_API_KEY: "test-key-ci"
