@@ -7,6 +7,7 @@ and exam generation.
 
 from fastapi import APIRouter, Depends, HTTPException
 from firebase_admin import auth
+from firebase_admin.auth import EmailAlreadyExistsError
 from pydantic import BaseModel
 
 from backend.app.ai_service import (
@@ -121,7 +122,7 @@ def create_student(student: StudentModel, db=Depends(get_firestore_db)):
                 email=student.email, password=student.password, display_name=student.full_name
             )
             uid = user_record.uid
-        except auth.EmailAlreadyExistsError:
+        except EmailAlreadyExistsError:
             raise HTTPException(status_code=400, detail="Email already exists")
         except Exception as e:
             logger.error("Firebase Auth error creating student: %s", e)
