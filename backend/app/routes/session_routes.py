@@ -59,6 +59,12 @@ class MessageRequest(BaseModel):
     message: str
 
 
+class HeartbeatRequest(BaseModel):
+    client_timestamp: float | None = None
+    tab_focused: bool = True
+    battery_level: float | None = None
+
+
 # --- Session CRUD ---
 
 
@@ -547,3 +553,52 @@ def mark_message_read(session_id: str, db=Depends(get_firestore_db)):
     except Exception as e:
         logger.error("Error marking message read for session %s: %s", session_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to mark message as read")
+
+
+@router.post("/sessions/{session_id}/heartbeat", tags=["Exam Session"])
+def log_session_heartbeat(
+    session_id: str,
+    data: HeartbeatRequest,
+    db=Depends(get_firestore_db)
+):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        session_ref = db.collection("sessions").document(session_id)
+        doc = session_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        now = datetime.now(UTC)
+        server_ts = now.timestamp()
+        drift_ms = round(abs(server_ts - (data.client_timestamp or server_ts)) * 1000, 2)
+
+        update_payload = {
+            "last_heartbeat": now.isoformat(),
+            "client_tab_focused": data.tab_focused,
+        }
+        if data.battery_level is not None:
+            update_payload["battery_level"] = data.battery_level
+
+        session_ref.update(update_payload)
+
+        if not data.tab_focused:
+            session_ref.collection("logs").add({
+                "message": "Tab lost focus during examination",
+                "timestamp": now.isoformat(),
+                "type": "tab_switch",
+                "drift_ms": drift_ms
+            })
+
+        return {
+            "status": "ok",
+            "server_timestamp": now.isoformat(),
+            "drift_ms": drift_ms,
+            "session_status": doc.to_dict().get("status", "Active")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error processing heartbeat for session %s: %s", session_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to record heartbeat")
