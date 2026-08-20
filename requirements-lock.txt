@@ -1,7 +1,7 @@
 # SecureEval Fully Pinned Dependency Lockfile
 # Generated for reproducible builds across environments
 
-aiofiles==24.1.0
+aiofiles==25.1.0
 annotated-types==0.7.0
 anyio==4.8.0
 bcrypt==4.0.1
