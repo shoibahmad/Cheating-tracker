@@ -1,0 +1,22 @@
+{
+  "name": "SecureEval DevContainer",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "backend",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "forwardPorts": [8000, 5173],
+  "postCreateCommand": "pip install -r requirements-lock.txt -r backend/requirements-dev.txt && cd frontend && npm ci"
+}
