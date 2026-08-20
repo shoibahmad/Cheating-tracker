@@ -3,7 +3,7 @@ testpaths = ["backend/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers --cov=backend/app --cov-fail-under=60 --cov-report=term-missing"
+addopts = "-v --tb=short --strict-markers --cov=backend/app --cov-fail-under=75 --cov-report=term-missing"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests requiring live services",
@@ -47,14 +47,22 @@ version = "2.5.0"
 description = "AI-Powered Exam Proctoring Platform with computer vision and Gemini AI integration"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
-authors = [
-    {name = "Shoib Ahmad"}
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn>=0.32.0,<1.0.0",
+    "pydantic>=2.9.0,<3.0.0",
+    "firebase-admin>=6.5.0,<7.0.0",
+    "python-multipart>=0.0.12,<1.0.0",
+    "sqlmodel>=0.0.22,<1.0.0",
+    "passlib>=1.7.4,<2.0.0",
+    "bcrypt==4.0.1",
+    "python-jose[cryptography]>=3.3.0,<4.0.0",
+    "opencv-python-headless>=4.10.0,<5.0.0",
+    "pytesseract>=0.3.10,<1.0.0",
+    "pillow>=10.4.0,<12.0.0",
+    "pdf2image>=1.17.0,<2.0.0",
+    "google-generativeai>=0.8.0,<1.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    "numpy>=1.26.0,<3.0.0",
 ]
-keywords = ["exam", "proctoring", "ai", "computer-vision", "fastapi"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Framework :: FastAPI",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Education",
-]
+
