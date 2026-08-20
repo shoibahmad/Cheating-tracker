@@ -1,52 +1,58 @@
-from typing import Optional, List
-from sqlmodel import Field, SQLModel, Relationship
+from typing import Optional
+
+from sqlmodel import Field, Relationship, SQLModel
+
 
 class Student(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     full_name: str
     email: str = Field(index=True, unique=True)
     password: str  # In production, hash this!
     role: str = "student"
-    institution: Optional[str] = None
-    course: Optional[str] = None
-    class_name: Optional[str] = None
+    institution: str | None = None
+    course: str | None = None
+    class_name: str | None = None
+
 
 class Question(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     text: str
-    options: str # JSON string of options
+    options: str  # JSON string of options
     correct_answer: int
-    exam_id: Optional[int] = Field(default=None, foreign_key="exam.id")
-    
+    exam_id: int | None = Field(default=None, foreign_key="exam.id")
+
     exam: Optional["Exam"] = Relationship(back_populates="questions")
 
+
 class Exam(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     title: str
     subject: str
-    created_at: str # ISO format string
+    created_at: str  # ISO format string
     created_by: str
     status: str = "draft"
-    
-    questions: List[Question] = Relationship(back_populates="exam")
+
+    questions: list[Question] = Relationship(back_populates="exam")
+
 
 class ExamSession(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    student_id: str 
+    id: int | None = Field(default=None, primary_key=True)
+    student_id: str
     student_name: str
-    exam_id: str # Firestore ID
+    exam_id: str  # Firestore ID
     exam_title: str
-    status: str = "Active" # Active, Completed, Terminated
+    status: str = "Active"  # Active, Completed, Terminated
     trust_score: int = 100
     created_at: str
-    termination_reason: Optional[str] = None
-    
-    logs: List["MonitoringLog"] = Relationship(back_populates="session")
+    termination_reason: str | None = None
+
+    logs: list["MonitoringLog"] = Relationship(back_populates="session")
+
 
 class MonitoringLog(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="examsession.id")
     message: str
     timestamp: str
-    
-    session: Optional[ExamSession] = Relationship(back_populates="logs")
+
+    session: ExamSession | None = Relationship(back_populates="logs")

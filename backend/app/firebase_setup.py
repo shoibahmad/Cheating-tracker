@@ -1,6 +1,7 @@
-import firebase_admin
-from firebase_admin import credentials, auth, firestore
 import os
+
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # Initialize Firebase Admin
 # Initialize Firebase Admin
@@ -10,8 +11,9 @@ cred_path = os.path.join(os.path.dirname(__file__), "..", cred_filename)
 if os.path.exists(cred_path):
     cred = credentials.Certificate(cred_path)
 elif os.getenv("FIREBASE_CREDENTIALS"):
-    import json
     import ast
+    import json
+
     # Parse JSON from environment variable
     cred_str = os.getenv("FIREBASE_CREDENTIALS")
     try:
@@ -23,7 +25,7 @@ elif os.getenv("FIREBASE_CREDENTIALS"):
         except Exception as e:
             print(f"Error parsing FIREBASE_CREDENTIALS: {e}")
             raise e
-            
+
     cred = credentials.Certificate(cred_dict)
 else:
     cred = None
@@ -34,6 +36,7 @@ if cred:
         firebase_admin.get_app()
     except ValueError:
         firebase_admin.initialize_app(cred)
+
 
 def get_db():
     try:
