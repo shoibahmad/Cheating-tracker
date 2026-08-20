@@ -58,39 +58,39 @@ This starts both backend (port 8000) and frontend (port 5173).
 
 ## Running Tests
 
-### Backend Tests
+### Backend Tests & Coverage Gate
 ```bash
-# Run all tests
-pytest backend/tests/ -v
-
-# Run with coverage
-pytest backend/tests/ -v --cov=backend/app --cov-report=term-missing
+# Run all tests with enforced 75% coverage gate
+pytest backend/tests/ -v --cov=backend/app --cov-fail-under=75 --cov-report=term-missing
 
 # Run a specific test file
 pytest backend/tests/test_sessions.py -v
 ```
 
-### Frontend Tests
+### Static Type Checking
+```bash
+# Typecheck backend modules with Mypy
+mypy backend/app --config-file pyproject.toml
+```
+
+### Frontend Tests & Coverage Gate
 ```bash
 cd frontend
 
-# Run all tests
-npm run test
+# Run all tests with enforced 70% coverage gate
+npm run test:coverage
 
 # Run in watch mode
 npm run test:watch
-
-# Run with coverage
-npm run test:coverage
 ```
 
-### Linting
+### Linting & Formatting
 ```bash
-# Python (ruff)
-pip install ruff
-ruff check backend/
+# Python (ruff linter and formatter)
+ruff check backend/ --config pyproject.toml
+ruff format backend/ --config pyproject.toml
 
-# JavaScript (eslint)
+# JavaScript/React (eslint)
 cd frontend && npm run lint
 ```
 
