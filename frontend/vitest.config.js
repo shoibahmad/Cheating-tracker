@@ -17,6 +17,11 @@ export default defineConfig({
         'src/main.jsx',
         'src/firebase.js',
       ],
+      thresholds: {
+        lines: 50,
+        functions: 50,
+        statements: 50,
+      },
     },
   },
 });
