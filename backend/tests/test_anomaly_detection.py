@@ -54,8 +54,7 @@ class TestAnomalyDetection:
 
     def test_integrity_summary_low_risk(self):
         summary = compute_session_integrity_summary(
-            {"trust_score": 98},
-            [{"timestamp": "2026-02-01T10:00:00Z", "trust_score": 98}]
+            {"trust_score": 98}, [{"timestamp": "2026-02-01T10:00:00Z", "trust_score": 98}]
         )
         assert summary["risk_level"] == "LOW"
         assert summary["burst_violations_detected"] is False
@@ -66,7 +65,7 @@ class TestAnomalyDetection:
             [
                 {"timestamp": "2026-02-01T10:00:00Z", "trust_score": 90},
                 {"timestamp": "2026-02-01T10:05:00Z", "trust_score": 80},
-            ]
+            ],
         )
         assert summary["risk_level"] == "MODERATE"
 
@@ -77,7 +76,7 @@ class TestAnomalyDetection:
                 {"timestamp": "2026-02-01T10:00:00Z", "trust_score": 70},
                 {"timestamp": "2026-02-01T10:00:05Z", "trust_score": 50},
                 {"timestamp": "2026-02-01T10:00:10Z", "trust_score": 30},
-            ]
+            ],
         )
         assert summary["risk_level"] == "CRITICAL"
         assert "Manual proctor audit required" in summary["recommendation"]

@@ -5,7 +5,6 @@ Covers: GET /health, GET /api/health, database connection statuses, uptime.
 """
 
 
-
 class TestHealthCheck:
     """Tests for health check endpoints."""
 

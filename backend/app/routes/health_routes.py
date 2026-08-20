@@ -40,8 +40,5 @@ def health_check(db=Depends(get_firestore_db)):
         "version": VERSION,
         "uptime_seconds": uptime_seconds,
         "timestamp": datetime.now(UTC).isoformat(),
-        "services": {
-            "database": db_status,
-            "api": "healthy"
-        }
+        "services": {"database": db_status, "api": "healthy"},
     }

@@ -23,7 +23,7 @@ class TestDatabase:
                 password="hashed",
                 role="student",
                 course="Computer Science",
-                class_name="2025"
+                class_name="2025",
             )
             session.add(student)
             session.commit()
@@ -32,9 +32,7 @@ class TestDatabase:
             assert student.id is not None
 
             # Query back
-            retrieved = session.exec(
-                select(Student).where(Student.email == "local@test.com")
-            ).first()
+            retrieved = session.exec(select(Student).where(Student.email == "local@test.com")).first()
             assert retrieved is not None
             assert retrieved.full_name == "Local DB Student"
             assert retrieved.course == "Computer Science"

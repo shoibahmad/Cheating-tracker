@@ -20,7 +20,7 @@ class TestStructuredLogging:
             lineno=25,
             msg="User %s logged in from %s",
             args=("admin", "127.0.0.1"),
-            exc_info=None
+            exc_info=None,
         )
 
         formatted = formatter.format(record)
@@ -38,6 +38,7 @@ class TestStructuredLogging:
             raise ValueError("Test error for logging")
         except ValueError:
             import sys
+
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
@@ -47,7 +48,7 @@ class TestStructuredLogging:
             lineno=45,
             msg="Exception caught",
             args=(),
-            exc_info=exc_info
+            exc_info=exc_info,
         )
 
         formatted = formatter.format(record)

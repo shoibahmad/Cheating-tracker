@@ -16,7 +16,7 @@ class TestModels:
             role="student",
             institution="Oxford",
             course="Physics",
-            class_name="2025"
+            class_name="2025",
         )
         assert student.full_name == "Jane Doe"
         assert student.email == "jane@example.com"
@@ -28,16 +28,13 @@ class TestModels:
             subject="Mathematics",
             created_at="2026-01-01T00:00:00",
             created_by="prof@oxford.edu",
-            status="published"
+            status="published",
         )
         assert exam.title == "Calculus I"
         assert exam.status == "published"
 
         question = Question(
-            text="Compute derivative of x^2",
-            options='["2x", "x", "x^3", "2"]',
-            correct_answer=0,
-            exam_id=1
+            text="Compute derivative of x^2", options='["2x", "x", "x^3", "2"]', correct_answer=0, exam_id=1
         )
         assert question.correct_answer == 0
         assert question.exam_id == 1
@@ -50,15 +47,11 @@ class TestModels:
             exam_title="Calculus I",
             status="Active",
             trust_score=100,
-            created_at="2026-01-01T00:00:00"
+            created_at="2026-01-01T00:00:00",
         )
         assert session.trust_score == 100
         assert session.status == "Active"
 
-        log = MonitoringLog(
-            session_id=1,
-            message="No face detected",
-            timestamp="2026-01-01T00:05:00"
-        )
+        log = MonitoringLog(session_id=1, message="No face detected", timestamp="2026-01-01T00:05:00")
         assert log.session_id == 1
         assert "face" in log.message

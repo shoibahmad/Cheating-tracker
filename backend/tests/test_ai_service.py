@@ -124,11 +124,9 @@ class TestEvaluateExamSubmission:
     @patch("backend.app.ai_service.genai")
     def test_descriptive_grading_success(self, mock_genai):
         mock_response = MagicMock()
-        mock_response.text = json.dumps({
-            "results": [
-                {"id": "q1", "score": 0.85, "remarks": "Very thorough explanation."}
-            ]
-        })
+        mock_response.text = json.dumps(
+            {"results": [{"id": "q1", "score": 0.85, "remarks": "Very thorough explanation."}]}
+        )
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
         mock_genai.GenerativeModel.return_value = mock_model
@@ -267,11 +265,9 @@ class TestCheckSemanticConsistency:
     @patch("backend.app.ai_service.genai")
     def test_successful_consistency_check(self, mock_genai):
         mock_response = MagicMock()
-        mock_response.text = json.dumps({
-            "style_consistency_score": 95,
-            "findings": "Consistent tone throughout answers.",
-            "suspicious_indices": []
-        })
+        mock_response.text = json.dumps(
+            {"style_consistency_score": 95, "findings": "Consistent tone throughout answers.", "suspicious_indices": []}
+        )
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
         mock_genai.GenerativeModel.return_value = mock_model

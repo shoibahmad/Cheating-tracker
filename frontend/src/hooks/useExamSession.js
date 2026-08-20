@@ -84,22 +84,13 @@ export const useExamSession = (sessionId, navigate) => {
         // Check for new admin message
         if (data.message && !data.is_message_read) {
           setCurrentMessage(data.message);
-          toast((t) => (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>💬 Proctor: {data.message}</span>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  // Mark as read
-                  fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message/read`, { method: 'POST' });
-                }}
-                className="btn btn-secondary"
-                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-              >
-                Dismiss
-              </button>
-            </div>
-          ), { duration: 10000, position: 'top-right' });
+          toast(`💬 Proctor: ${data.message}`, {
+            duration: 8000,
+            position: 'top-right',
+            style: { background: '#1e293b', color: '#fff', border: '1px solid #3b82f6' },
+          });
+          // Mark as read
+          fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message/read`, { method: 'POST' });
         }
       } catch (err) {
         logger.error('Polling session status error', err);

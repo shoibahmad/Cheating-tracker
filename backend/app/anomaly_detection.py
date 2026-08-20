@@ -47,11 +47,7 @@ def calculate_trust_velocity(logs: list[dict[str, Any]], time_window_seconds: in
     return round(rate_per_minute, 2)
 
 
-def detect_burst_violations(
-    logs: list[dict[str, Any]],
-    burst_threshold: int = 3,
-    window_seconds: int = 30
-) -> bool:
+def detect_burst_violations(logs: list[dict[str, Any]], burst_threshold: int = 3, window_seconds: int = 30) -> bool:
     """
     Detect if multiple violations occurred in a very short time window.
     """
@@ -79,10 +75,7 @@ def detect_burst_violations(
     return False
 
 
-def compute_session_integrity_summary(
-    session_data: dict[str, Any],
-    logs: list[dict[str, Any]]
-) -> dict[str, Any]:
+def compute_session_integrity_summary(session_data: dict[str, Any], logs: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Produce an automated integrity assessment based on trust score, logs, and velocity.
     """
@@ -110,5 +103,5 @@ def compute_session_integrity_summary(
         "violation_count": violation_count,
         "burst_violations_detected": has_burst,
         "trust_velocity_per_min": velocity,
-        "recommendation": recommendation
+        "recommendation": recommendation,
     }

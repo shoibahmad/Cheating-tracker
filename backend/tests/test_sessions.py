@@ -119,23 +119,24 @@ class TestSubmitExam:
         assert response.json()["message"] == "Already submitted"
 
     def test_submit_successful_mcq_grading(self, client, mock_db):
-        mock_db.collection("exams").document("exam-mcq").set({
-            "title": "MCQ Test",
-            "questions": [
-                {"id": 0, "text": "2+2?", "type": "mcq", "options": ["3", "4", "5"], "correct_answer": 1}
-            ]
-        })
-        mock_db.collection("sessions").document("sess-mcq").set({
-            "status": "Active",
-            "exam_id": "exam-mcq",
-            "student_id": "stud_1",
-            "trust_score": 100,
-        })
-
-        response = client.post(
-            "/api/sessions/sess-mcq/submit",
-            json={"answers": {"0": "1"}}
+        mock_db.collection("exams").document("exam-mcq").set(
+            {
+                "title": "MCQ Test",
+                "questions": [
+                    {"id": 0, "text": "2+2?", "type": "mcq", "options": ["3", "4", "5"], "correct_answer": 1}
+                ],
+            }
         )
+        mock_db.collection("sessions").document("sess-mcq").set(
+            {
+                "status": "Active",
+                "exam_id": "exam-mcq",
+                "student_id": "stud_1",
+                "trust_score": 100,
+            }
+        )
+
+        response = client.post("/api/sessions/sess-mcq/submit", json={"answers": {"0": "1"}})
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Exam submitted successfully"
@@ -286,15 +287,12 @@ class TestGenerateReport:
         mock_gen_report.return_value = {
             "summary": "Completed without violations.",
             "trust_score": 98,
-            "suspicious_moments": []
+            "suspicious_moments": [],
         }
 
-        mock_db.collection("sessions").document("sess_rep_1").set({
-            "status": "Completed",
-            "score": 10,
-            "total": 10,
-            "trust_score": 98
-        })
+        mock_db.collection("sessions").document("sess_rep_1").set(
+            {"status": "Completed", "score": 10, "total": 10, "trust_score": 98}
+        )
 
         response = client.post("/api/sessions/sess_rep_1/generate-report")
         assert response.status_code == 200

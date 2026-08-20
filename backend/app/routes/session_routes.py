@@ -13,7 +13,6 @@ from pydantic import BaseModel
 
 from backend.app.dependencies import get_firestore_db
 from backend.app.errors import (
-    ExamAlreadySubmittedError,
     FirestoreUnavailableError,
     SecureEvalError,
     SessionNotFoundError,

@@ -9,16 +9,18 @@ class TestSessionExport:
     """Tests for GET /api/admin/exams/export."""
 
     def test_export_sessions_as_json(self, client, mock_db):
-        mock_db.collection("sessions").document("s1").set({
-            "student_name": "Alice",
-            "student_id": "stud_1",
-            "exam_title": "Math 101",
-            "status": "Completed",
-            "trust_score": 98,
-            "score": 9,
-            "percentage": 90,
-            "created_at": "2026-02-01T10:00:00"
-        })
+        mock_db.collection("sessions").document("s1").set(
+            {
+                "student_name": "Alice",
+                "student_id": "stud_1",
+                "exam_title": "Math 101",
+                "status": "Completed",
+                "trust_score": 98,
+                "score": 9,
+                "percentage": 90,
+                "created_at": "2026-02-01T10:00:00",
+            }
+        )
 
         response = client.get("/api/admin/exams/export?format=json")
         assert response.status_code == 200
@@ -28,16 +30,18 @@ class TestSessionExport:
         assert data["sessions"][0]["student_name"] == "Alice"
 
     def test_export_sessions_as_csv(self, client, mock_db):
-        mock_db.collection("sessions").document("s2").set({
-            "student_name": "Bob",
-            "student_id": "stud_2",
-            "exam_title": "Chemistry",
-            "status": "Active",
-            "trust_score": 85,
-            "score": 0,
-            "percentage": 0,
-            "created_at": "2026-02-02T10:00:00"
-        })
+        mock_db.collection("sessions").document("s2").set(
+            {
+                "student_name": "Bob",
+                "student_id": "stud_2",
+                "exam_title": "Chemistry",
+                "status": "Active",
+                "trust_score": 85,
+                "score": 0,
+                "percentage": 0,
+                "created_at": "2026-02-02T10:00:00",
+            }
+        )
 
         response = client.get("/api/admin/exams/export?format=csv")
         assert response.status_code == 200

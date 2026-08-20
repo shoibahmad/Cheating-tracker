@@ -31,6 +31,7 @@ app = FastAPI(
 
 from backend.app.errors import SecureEvalError
 
+
 # --- Global Exception Handlers ---
 @app.exception_handler(SecureEvalError)
 async def secureeval_exception_handler(request: Request, exc: SecureEvalError):
@@ -60,7 +61,6 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500, content={"detail": "An internal server error occurred. Please try again later."}
     )
-
 
 
 # --- Middleware ---

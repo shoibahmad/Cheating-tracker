@@ -91,26 +91,42 @@ def export_session_history(format: str = "json", db=Depends(get_firestore_db)):
     if format.lower() == "csv":
         import csv
         import io
+
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Session ID", "Student ID", "Student Name", "Exam Title", "Status", "Trust Score", "Score", "Percentage", "Created At"])
+        writer.writerow(
+            [
+                "Session ID",
+                "Student ID",
+                "Student Name",
+                "Exam Title",
+                "Status",
+                "Trust Score",
+                "Score",
+                "Percentage",
+                "Created At",
+            ]
+        )
         for s in sessions:
-            writer.writerow([
-                s.get("id", ""),
-                s.get("student_id", ""),
-                s.get("student_name", ""),
-                s.get("exam_title", ""),
-                s.get("status", ""),
-                s.get("trust_score", 100),
-                s.get("score", 0),
-                s.get("percentage", 0),
-                s.get("created_at", "")
-            ])
+            writer.writerow(
+                [
+                    s.get("id", ""),
+                    s.get("student_id", ""),
+                    s.get("student_name", ""),
+                    s.get("exam_title", ""),
+                    s.get("status", ""),
+                    s.get("trust_score", 100),
+                    s.get("score", 0),
+                    s.get("percentage", 0),
+                    s.get("created_at", ""),
+                ]
+            )
         from fastapi.responses import Response
+
         return Response(
             content=output.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=exam_sessions_export.csv"}
+            headers={"Content-Disposition": "attachment; filename=exam_sessions_export.csv"},
         )
 
     return {"sessions": sessions, "total_count": len(sessions)}
