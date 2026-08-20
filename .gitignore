@@ -66,8 +66,26 @@ node_modules/
 # Yarn Integrity file
 .yarn-integrity
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
 # dotenv environment variables file
 .env
+.env.local
+.env.*.local
 
 # dataconnect generated files
 .dataconnect
